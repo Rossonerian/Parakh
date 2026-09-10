@@ -81,7 +81,8 @@ def test_compare_is_matched_and_reports_family_not_prompt_multiplication():
     assert result.matched_cases == 4
     assert result.by_domain[cases[0].domain]["n"] == 1
     assert result.family_counts[cases[0].family_id] == 1
-    assert result.observed_difference == -1.0
+    # Comparison is defined as left-minus-right.
+    assert result.observed_difference == 1.0
     assert result.independence_unit == "family_id"
 
 

@@ -38,7 +38,15 @@ class CandidateInput:
         return self._payload["prompt_hash"]
 
     def to_dict(self) -> dict[str, Any]:
-        return deepcopy(dict(self._payload))
+        # MappingProxyType is deliberately not pickle/deepcopy-able. Rebuild a
+        # mutable detached structure explicitly while keeping the stored view
+        # immutable.
+        return {
+            "case_id": self.case_id,
+            "messages": [dict(message) for message in self.messages],
+            "limits": dict(self.limits),
+            "prompt_hash": self.prompt_hash,
+        }
 
     def __getattr__(self, name: str) -> Any:
         if name in HIDDEN_FIELDS:
@@ -60,4 +68,3 @@ def assert_candidate_safe(payload: dict[str, Any]) -> None:
         raise ValidationError("candidate payload contains unsupported fields")
     if not isinstance(payload["messages"], list) or not payload["messages"]:
         raise ValidationError("candidate payload messages must be a non-empty list")
-

@@ -44,7 +44,8 @@ def _text(value: Any) -> str:
 def normalize_text(value: str) -> str:
     """Conservative normalization: case/whitespace/punctuation, not paraphrase."""
     value = re.sub(r"\s+", " ", value.strip()).casefold()
-    return re.sub(r"\s*([,.;:!?])\s*", r"\1", value)
+    value = re.sub(r"\s*([,.;:!?])\s*", r"\1", value)
+    return re.sub(r"[^\w\s]", "", value, flags=re.UNICODE)
 
 
 def grade_exact_text(candidate: str, reference: str, *, attempt_id: str) -> Grade:
