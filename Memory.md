@@ -17,20 +17,21 @@ Branch: main (no baseline commit existed at intake)
 - Structural candidate isolation is in `model_lab/isolation.py`; candidate payloads exclude evaluation data, split/family metadata, and annotations.
 - Dependency-free CLI currently supports `suite validate`, `suite inspect`, and protected candidate-only export.
 - Integrated storage, deterministic fake providers, execution/retry/cancellation/budget handling, structured ingestion, deterministic grading, blind review, matched comparison/regression, escaped reports/charts, Promptfoo fixture reconciliation, draft routing evidence, and optional fail-closed Ollama/OpenRouter HTTP adapters.
-- CLI now includes `doctor`, `demo`, `run`, `import`, `grade`, `review export/import`, `compare`, `report`, `audit`, and `router recommend --draft`; Makefile release targets are documented.
+- CLI now includes `init`, `doctor`, `plan`, `demo`, `run`, `import`, `grade`, `review export/import`, persisted-run `compare`, persisted-run `report`, persisted-run `audit`, `promptfoo export/import`, and `router recommend --draft`; Makefile release/dev targets are documented.
 
 ## Verified evidence
 
 - Clean editable install: `python3 -m venv .venv` and `.venv/bin/python -m pip install -e '.[dev]'` passed.
-- `make PYTHON=.venv/bin/python test-release`: doctor passed; 30 pytest tests passed; offline E2E passed.
-- Full offline demo with seed 0.1.0 and seed 29: 60 cases validated, 60 attempts per synthetic candidate, 60 matched comparisons, JSON/CSV/Markdown/HTML/SVG artifacts, accepted Promptfoo fixture, tampered fixture quarantined, router draft left production config unchanged.
+- `make PYTHON=.venv/bin/python test-release`: doctor passed; 31 pytest tests passed; offline E2E passed.
+- Full offline demo with seed 0.1.0 and seeds 29/37: 60 cases validated, 60 attempts per synthetic candidate, non-null good-vs-incorrect delta 1.0, JSON/CSV/Markdown/HTML/SVG artifacts, accepted Promptfoo fixture, tampered fixture quarantined, router draft left production config unchanged.
 - Repeated deterministic demo with the same seed produced identical stable good/bad digests and suite hash.
+- Two consecutive `make PYTHON=.venv/bin/python dev` runs passed using distinct disposable `lab-data/dev.XXXXXX` directories.
 - Final `git diff --check` passed and final `git status --short --branch` was clean on `main` at `48fbf74`.
 
 ## Review/blockers
 
 - Three worker handoffs were durably committed and integrated: ML-01 `0e784a2`, ML-03 `126ffe8`, ML-02 `e4b1853` (requested Luna/medium; effective worker model metadata unavailable).
-- A requested Terra/medium read-only Supervisor was spawned, but the runtime returned a usage-limit error before a verdict. No independent Supervisor approval is claimed; Boss verification is the evidence available for this handoff.
+- The first requested Terra/medium read-only Supervisor attempt hit a usage-limit error. A retry on the exact corrected tree returned `APPROVED`; requested model was Terra/medium, but effective runtime model identity remained unknown.
 - The repository references `PRD.md`, `Design.md`, and `Tier_Entitlements.md`, but those files were absent at intake. No requirements were invented for them.
 - No paid provider calls, live customer data, production deployment, migrations, charges, or outbound messages were performed.
 
