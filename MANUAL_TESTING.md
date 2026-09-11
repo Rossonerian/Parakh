@@ -9,6 +9,8 @@ python3 --version
 python3 -m venv .venv
 .venv/bin/python -m pip install -e '.[dev]'
 .venv/bin/python -m model_lab --help
+.venv/bin/python -m model_lab doctor
+make PYTHON=.venv/bin/python test-release
 ```
 
 The implementation has no runtime network dependency. Keep live-provider keys in environment variables only; do not place them in benchmark files, SQLite records, reports, or `Memory.md`.
@@ -63,7 +65,17 @@ Repeat the same fake run with the same suite hash, provider variant, configurati
 
 Live providers are optional and require an explicit approved run plan, bounded case/retry/output counts, timeout, concurrency, and conservative spend ceiling. Start with a small development subset and a dry-run/configuration check. Unknown pricing blocks paid scheduling unless an operator supplies a conservative bound labeled as such. Never run paid calls from CI or the default offline commands. Ollama/local execution may be used without cloud spend when its adapter is available; remote providers must remain fail-closed without credentials.
 
+## Blind-review and grading CLI
+
+```bash
+.venv/bin/python -m model_lab review export --db lab-data/demo/model_lab.sqlite3 --run run-synthetic-good --out /tmp/review.jsonl
+# Complete selected rows with decision/reviewer_pseudonym/score/confidence.
+.venv/bin/python -m model_lab review import --db lab-data/demo/model_lab.sqlite3 --run run-synthetic-good --in /tmp/review-completed.jsonl
+.venv/bin/python -m model_lab grade --db lab-data/demo/model_lab.sqlite3 --suite benchmarks/seed_cases.jsonl --run run-synthetic-good
+```
+
+Grade persistence is idempotent: existing grade IDs are reported as already present rather than overwritten.
+
 ## Evidence locations
 
 Use a disposable `lab-data/` directory for SQLite and raw artifacts, and a disposable `reports/` directory for generated outputs. Keep raw attempt records alongside their source hashes and run manifests. Record actual commands, exit statuses, observations, and skipped/manual-blocked checks in the release handoff; do not mark external provider/channel checks passed from fake data.
-
