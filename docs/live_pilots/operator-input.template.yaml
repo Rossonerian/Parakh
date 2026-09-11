@@ -1,0 +1,58 @@
+# Development-only live-pilot input template v0.1.0.
+# Every commercial value is intentionally blank/invalid. Do not add secrets.
+schema_version: "0.1.0"
+development_only: true
+exclusions:
+  customer_data: true
+  calibration_holdout: true
+  production_router_changes: true
+  external_actions: true
+case_selection:
+  split: train
+  case_ids: []
+candidates:
+  - identifier: ""
+    provider: ""
+    model: ""
+    display_label: ""
+    revision: ""
+  - identifier: ""
+    provider: ""
+    model: ""
+    display_label: ""
+    revision: ""
+  - identifier: ""
+    provider: """
+    model: ""
+    display_label: ""
+    revision: ""
+pricing_snapshot:
+  as_of: ""
+  currency: ""
+  source: ""
+  rates:
+    "":
+      input_per_million: 0
+      output_per_million: 0
+      cache_per_million: 0
+      reasoning_per_million: 0
+      tool_per_call: 0
+execution:
+  max_input_tokens: 0
+  max_output_tokens: 0
+  timeout_seconds: 0
+  retry_limit: 0
+  concurrency: 1
+  repeats: 2
+  temperature: 0
+  seed: 17
+budget:
+  currency: ""
+  total_max_spend: 0
+  per_model_max_spend:
+    "": 0
+authorization:
+  operator_identity: ""
+  authorized_at: ""
+  approved: false
+  maximum_spend_authorized: 0
