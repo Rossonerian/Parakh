@@ -26,6 +26,23 @@ def load_constraint_map(path: str | Path) -> dict[str, Any]:
         raise ValidationError(f"invalid router constraint map: {source}") from exc
     if not isinstance(value, dict) or value.get("schema_version") != "router-constraint-map/0.2.0":
         raise ValidationError("unsupported router constraint map schema")
+    manifest_path = Path(str(value.get("source_manifest", "")))
+    if not manifest_path.is_file():
+        raise ValidationError("router constraint map source manifest is unavailable")
+    if value.get("source_manifest_sha256") != file_sha256(manifest_path):
+        raise ValidationError("router constraint map source manifest hash mismatch")
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise ValidationError("router constraint map source manifest is invalid") from exc
+    documents = manifest.get("documents") if isinstance(manifest, dict) else None
+    if not isinstance(documents, dict):
+        raise ValidationError("router constraint map source manifest lacks documents")
+    imported_hashes = {
+        str(record.get("imported_path")): str(record.get("source_sha256"))
+        for record in documents.values()
+        if isinstance(record, dict) and record.get("imported_path") and record.get("source_sha256")
+    }
     constraints = value.get("constraints")
     if not isinstance(constraints, list) or not constraints:
         raise ValidationError("router constraint map must contain constraints")
@@ -47,6 +64,12 @@ def load_constraint_map(path: str | Path) -> dict[str, Any]:
         for citation in citations:
             if not isinstance(citation, dict) or not {"source_file", "section", "source_sha256"} <= set(citation):
                 raise ValidationError(f"constraint {identifier} has an invalid citation")
+            cited_path = str(citation["source_file"])
+            cited_hash = str(citation["source_sha256"])
+            if imported_hashes.get(cited_path) != cited_hash:
+                raise ValidationError(f"constraint {identifier} citation does not match source manifest")
+            if not Path(cited_path).is_file() or file_sha256(cited_path) != cited_hash:
+                raise ValidationError(f"constraint {identifier} citation source hash mismatch")
     return value
 
 

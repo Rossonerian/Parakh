@@ -77,6 +77,7 @@ class ExecutionEngine:
                 failures += 1
                 self.store.update_run_status(run.run_id, "partial")
                 break
+            logical_attempts: list[Attempt] = []
             for retry in range(self.max_retries + 1):
                 attempt_id = _id("att", run.run_id, case.case_id, str(retry))
                 started = utc_now()
@@ -108,13 +109,19 @@ class ExecutionEngine:
                 attempt = Attempt(attempt_id=attempt_id, run_id=run.run_id, logical_request_id=logical, case_id=case.case_id, model_config=run.model_config, prompt_hash=case.prompt_hash, response_text=response_text, status=status, started_at=started, completed_at=completed, finish_reason=finish_reason, error=error, first_token_latency_ms=first_latency, completion_latency_ms=completion_latency, input_tokens=input_tokens, output_tokens=output_tokens, cost_minor=cost_minor, currency=currency, raw_metadata=metadata)
                 self.store.add_attempt(attempt)
                 produced.append(attempt)
+                logical_attempts.append(attempt)
                 if status is AttemptStatus.SUCCESS or status not in {AttemptStatus.PROVIDER_FAILURE, AttemptStatus.TIMEOUT} or retry == self.max_retries:
                     if status is not AttemptStatus.SUCCESS:
                         failures += 1
                     break
                 if self.retry_delay_seconds:
                     time.sleep(self.retry_delay_seconds)
-            self.budgets.settle(reservation, actual_cost_minor=produced[-1].cost_minor)
+            # A timeout/failure can still be billable. Never settle using just
+            # the final retry: all retry costs must be known before an exact
+            # settlement can replace the conservative reservation.
+            retry_costs = [attempt.cost_minor for attempt in logical_attempts]
+            actual_cost = sum(retry_costs) if retry_costs and all(cost is not None for cost in retry_costs) else None
+            self.budgets.settle(reservation, actual_cost_minor=actual_cost)
         current = self.store.get_run(run.run_id)
         if current.status == "running":
             self.store.update_run_status(run.run_id, "partial" if failures else "completed")

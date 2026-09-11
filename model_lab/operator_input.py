@@ -418,7 +418,9 @@ def validate_operator_input(value: Mapping[str, Any], *, suite_path: str | Path)
     }
 
 
-def build_immutable_plan(value: Mapping[str, Any], *, suite_path: str | Path, source_hash: str | None = None, constraint_hash: str | None = None, created_at: str | None = None) -> dict[str, Any]:
+def build_immutable_plan(value: Mapping[str, Any], *, suite_path: str | Path, source_hash: str | None = None,
+                         constraint_hash: str | None = None, source_manifest_path: str | None = None,
+                         constraint_map_path: str | None = None, created_at: str | None = None) -> dict[str, Any]:
     validated = validate_operator_input(value, suite_path=suite_path)
     plan = dict(validated)
     plan["plan_version"] = "0.1.0"
@@ -426,6 +428,8 @@ def build_immutable_plan(value: Mapping[str, Any], *, suite_path: str | Path, so
     plan["operator_input_hash"] = stable_hash(value)
     plan["source_hash"] = source_hash
     plan["constraint_hash"] = constraint_hash
+    plan["source_manifest_path"] = source_manifest_path
+    plan["constraint_map_path"] = constraint_map_path
     plan["case_set_hash"] = stable_hash(plan["case_ids"])
     plan["model_configuration_hash"] = stable_hash({"candidates": plan["candidates"], "execution": plan["execution"], "prompt_template_revision": plan["prompt_template_revision"]})
     plan["pricing_snapshot_hash"] = stable_hash(plan["pricing_snapshot"])

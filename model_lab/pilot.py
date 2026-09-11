@@ -27,6 +27,10 @@ class PilotBlockedError(ModelLabError):
     """A live pilot cannot dispatch under the current authorization state."""
 
 
+def _file_sha256(path: str | Path) -> str:
+    return hashlib.sha256(Path(path).read_bytes()).hexdigest()
+
+
 @dataclass(frozen=True)
 class CandidateSpec:
     provider: str
@@ -172,12 +176,42 @@ def authorize_dispatch(plan: Mapping[str, Any], *, approved_by: str, approved_ma
     return result
 
 
-def require_dispatch_authorization(plan: Mapping[str, Any], *, allow_paid: bool) -> None:
+def verify_immutable_plan(plan: Mapping[str, Any], *, source_manifest_path: str | Path, constraint_map_path: str | Path) -> None:
+    """Verify every frozen content and source binding before paid dispatch."""
+    if plan.get("immutable") is not True or not isinstance(plan.get("plan_hash"), str):
+        raise PilotBlockedError("paid pilot execution requires an immutable hashed plan")
+    unsigned = dict(plan)
+    plan_hash = unsigned.pop("plan_hash")
+    if stable_hash(unsigned) != plan_hash:
+        raise PilotBlockedError("immutable plan hash mismatch")
+    expected = {
+        "case_set_hash": stable_hash(plan.get("case_ids")),
+        "model_configuration_hash": stable_hash({"candidates": plan.get("candidates"), "execution": plan.get("execution"), "prompt_template_revision": plan.get("prompt_template_revision")}),
+        "pricing_snapshot_hash": stable_hash(plan.get("pricing_snapshot")),
+        "source_hash": _file_sha256(source_manifest_path),
+        "constraint_hash": _file_sha256(constraint_map_path),
+    }
+    for name, actual in expected.items():
+        if plan.get(name) != actual:
+            raise PilotBlockedError(f"immutable plan {name} mismatch")
+    if plan.get("source_manifest_path") not in (None, str(source_manifest_path)):
+        raise PilotBlockedError("immutable plan source manifest path mismatch")
+    if plan.get("constraint_map_path") not in (None, str(constraint_map_path)):
+        raise PilotBlockedError("immutable plan constraint map path mismatch")
+
+
+def require_dispatch_authorization(plan: Mapping[str, Any], *, allow_paid: bool,
+                                   source_manifest_path: str | Path | None = None,
+                                   constraint_map_path: str | Path | None = None) -> None:
     blockers = validate_pilot_plan(plan)
     if not allow_paid:
         blockers.append("explicit_allow_paid_acknowledgement_required")
     if blockers:
         raise PilotBlockedError("live pilot blocked: " + ", ".join(sorted(set(blockers))))
+    if plan.get("immutable") is True:
+        if source_manifest_path is None or constraint_map_path is None:
+            raise PilotBlockedError("immutable plan source and constraint paths are required")
+        verify_immutable_plan(plan, source_manifest_path=source_manifest_path, constraint_map_path=constraint_map_path)
 
 
 def dispatch_preview(plan: Mapping[str, Any]) -> dict[str, Any]:
@@ -227,7 +261,8 @@ def _provider_for(candidate: Mapping[str, Any]):
     raise PilotBlockedError(f"unsupported pilot provider: {provider}")
 
 
-def run_authorized_immutable_pilot(plan: Mapping[str, Any], *, suite_path: str | Path, output_dir: str | Path) -> dict[str, Any]:
+def run_authorized_immutable_pilot(plan: Mapping[str, Any], *, suite_path: str | Path, output_dir: str | Path,
+                                   source_manifest_path: str | Path, constraint_map_path: str | Path) -> dict[str, Any]:
     """Execute a validated, authorized development plan; never alters app routing.
 
     This path is intentionally unavailable to incomplete plans.  It is not used
@@ -235,7 +270,7 @@ def run_authorized_immutable_pilot(plan: Mapping[str, Any], *, suite_path: str |
     """
     if plan.get("immutable") is not True:
         raise PilotBlockedError("paid pilot execution requires an immutable operator plan")
-    require_dispatch_authorization(plan, allow_paid=True)
+    require_dispatch_authorization(plan, allow_paid=True, source_manifest_path=source_manifest_path, constraint_map_path=constraint_map_path)
     execution = plan["execution"]
     if execution["concurrency"] != 1:
         raise PilotBlockedError("live pilot runner currently supports concurrency=1 only")

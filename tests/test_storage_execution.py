@@ -7,6 +7,7 @@ from model_lab.benchmark import load_suite
 from model_lab.errors import BudgetExceededError, IntegrityError
 from model_lab.execution import ExecutionEngine
 from model_lab.providers import FakeProvider, FakeVariant, OllamaProvider, ProviderConfigurationError
+from model_lab.providers.base import ProviderCapabilities, ProviderRequest, ProviderResponse, ProviderRuntimeError
 from model_lab.schemas import Budget, ModelConfig, Run
 from model_lab.storage import SQLiteStore
 
@@ -64,3 +65,26 @@ def test_budget_stops_after_request_limit():
 def test_live_adapter_fails_closed_without_secret():
     with pytest.raises(ProviderConfigurationError):
         OllamaProvider("local", env={}).generate(None)  # type: ignore[arg-type]
+
+
+def test_retry_with_unknown_failed_attempt_cost_keeps_conservative_reservation():
+    class FailsThenSucceeds:
+        name = "test"
+        capabilities = ProviderCapabilities("test", "model")
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def generate(self, request: ProviderRequest) -> ProviderResponse:
+            self.calls += 1
+            if self.calls == 1:
+                raise ProviderRuntimeError("provider timeout after possible charge")
+            return ProviderResponse(text="ok", cost_minor=2, currency="USD")
+
+    suite = load_suite(ROOT / "benchmarks/seed_cases.jsonl")
+    store = SQLiteStore()
+    run = make_run(suite, run_id="run-unknown-retry", budget=Budget(max_requests=1, max_cost_minor=10, currency="USD"))
+    result = ExecutionEngine(store, FailsThenSucceeds(), max_retries=1, estimated_cost_minor_per_logical_request=8).execute(suite, run, case_ids=[suite.case_ids[0]])
+    assert result.status == "completed"
+    row = store.connection.execute("SELECT state, actual_cost_minor, reserved_cost_minor FROM budget_reservations").fetchone()
+    assert tuple(row) == ("unknown", None, 8)

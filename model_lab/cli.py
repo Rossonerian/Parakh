@@ -136,6 +136,8 @@ def build_parser() -> argparse.ArgumentParser:
     pilot_run.add_argument("--allow-paid", action="store_true")
     pilot_run.add_argument("--suite", default="benchmarks/seed_cases.jsonl")
     pilot_run.add_argument("--out", default="lab-data/live-pilots")
+    pilot_run.add_argument("--source-manifest", default="docs/product_sources/SOURCE_MANIFEST.json")
+    pilot_run.add_argument("--constraint-map", default="docs/live_pilots/router-constraint-map-v0.2.0.json")
 
     review = sub.add_parser("review", help="export or import blind human review records")
     review_sub = review.add_subparsers(dest="review_command", required=True)
@@ -278,7 +280,10 @@ def main(argv: list[str] | None = None) -> int:
                     value = load_operator_input(args.operator_input)
                     source_hash = file_sha256(args.source_manifest)
                     constraint_hash = file_sha256(args.constraint_map)
-                    plan = build_immutable_plan(value, suite_path=args.suite, source_hash=source_hash, constraint_hash=constraint_hash)
+                    plan = build_immutable_plan(
+                        value, suite_path=args.suite, source_hash=source_hash, constraint_hash=constraint_hash,
+                        source_manifest_path=args.source_manifest, constraint_map_path=args.constraint_map,
+                    )
                     write_immutable_plan(plan, args.out)
                     _print_json(plan)
                     return 0
@@ -314,8 +319,14 @@ def main(argv: list[str] | None = None) -> int:
                 _print_json(display)
                 return 0 if not display["current_blockers"] else 2
             _print_json(dispatch_preview(plan))
-            require_dispatch_authorization(plan, allow_paid=args.allow_paid)
-            _print_json(run_authorized_immutable_pilot(plan, suite_path=args.suite, output_dir=args.out))
+            require_dispatch_authorization(
+                plan, allow_paid=args.allow_paid, source_manifest_path=args.source_manifest,
+                constraint_map_path=args.constraint_map,
+            )
+            _print_json(run_authorized_immutable_pilot(
+                plan, suite_path=args.suite, output_dir=args.out,
+                source_manifest_path=args.source_manifest, constraint_map_path=args.constraint_map,
+            ))
             return 0
         if args.command == "review":
             store = SQLiteStore(args.db)
