@@ -20,9 +20,21 @@ from .storage import SQLiteStore
 
 
 def _candidate_output(case: Any, *, incorrect: bool = False) -> str:
-    if incorrect:
-        return "synthetic incorrect answer"
     reference = case.evaluation.reference_answer
+    if incorrect:
+        def wrong(value: Any) -> Any:
+            if isinstance(value, bool):
+                return not value
+            if isinstance(value, (int, float)):
+                return value + 1
+            if isinstance(value, str):
+                return "wrong"
+            if isinstance(value, list):
+                return [wrong(item) for item in value] or ["wrong"]
+            if isinstance(value, dict):
+                return {key: wrong(item) for key, item in value.items()}
+            return "wrong"
+        reference = wrong(reference)
     if isinstance(reference, str):
         return reference
     return json.dumps(reference, ensure_ascii=False, sort_keys=True, separators=(",", ":"))

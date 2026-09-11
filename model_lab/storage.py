@@ -165,6 +165,8 @@ class SQLiteStore:
             raise ValidationError("unsupported count table")
         if run_id is None:
             return int(self.connection.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0])
+        if table == "grades":
+            return int(self.connection.execute("SELECT COUNT(*) FROM grades JOIN attempts ON attempts.attempt_id = grades.attempt_id WHERE attempts.run_id = ?", (run_id,)).fetchone()[0])
         return int(self.connection.execute(f"SELECT COUNT(*) FROM {table} WHERE run_id = ?", (run_id,)).fetchone()[0])
 
     def reserve_budget(self, reservation_id: str, run_id: str, logical_request_id: str, max_requests: int | None, max_cost_minor: int | None, estimated_cost_minor: int | None, currency: str | None, created_at: str, max_cases: int | None = None) -> None:

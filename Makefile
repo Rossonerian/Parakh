@@ -1,9 +1,12 @@
 PYTHON ?= python3
 
-.PHONY: doctor test-unit test-integration test-e2e test-smoke test-release demo
+.PHONY: doctor dev test-unit test-integration test-e2e test-smoke test-release demo
 
 doctor:
 	$(PYTHON) -m model_lab doctor
+
+dev:
+	$(PYTHON) -m model_lab demo --suite benchmarks/seed_cases.jsonl --out lab-data/dev
 
 test-unit:
 	$(PYTHON) -m pytest -q
@@ -21,4 +24,3 @@ test-release: doctor test-unit test-e2e
 
 demo:
 	$(PYTHON) -m model_lab demo --suite benchmarks/seed_cases.jsonl --out lab-data/demo
-

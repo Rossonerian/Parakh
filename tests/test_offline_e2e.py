@@ -19,6 +19,7 @@ def test_complete_60_case_offline_pipeline(tmp_path: Path):
     assert first["runs"]["synthetic-good"]["digest"] == second["runs"]["synthetic-good"]["digest"]
     assert first["runs"]["synthetic-incorrect"]["digest"] == second["runs"]["synthetic-incorrect"]["digest"]
     assert first["comparison"]["matched_cases"] == 60
+    assert first["comparison"]["observed_difference"] == 1.0
     assert first["routing_recommendations"][0]["candidate_model"] == "synthetic-good"
     assert first["promptfoo"]["accepted_fixture"] is True
     assert first["promptfoo"]["tampered_fixture_accepted"] is False
