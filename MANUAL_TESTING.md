@@ -11,6 +11,7 @@ python3 -m venv .venv
 .venv/bin/python -m model_lab --help
 .venv/bin/python -m model_lab doctor
 make PYTHON=.venv/bin/python test-release
+# `make dev` uses a fresh disposable `lab-data/dev.XXXXXX` directory each time.
 ```
 
 The implementation has no runtime network dependency. Keep live-provider keys in environment variables only; do not place them in benchmark files, SQLite records, reports, or `Memory.md`.

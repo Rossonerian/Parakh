@@ -6,7 +6,8 @@ doctor:
 	$(PYTHON) -m model_lab doctor
 
 dev:
-	$(PYTHON) -m model_lab demo --suite benchmarks/seed_cases.jsonl --out lab-data/dev
+	@mkdir -p lab-data
+	@dev_dir=$$(mktemp -d lab-data/dev.XXXXXX); echo "ModelLab dev output: $$dev_dir"; $(PYTHON) -m model_lab demo --suite benchmarks/seed_cases.jsonl --out "$$dev_dir"
 
 test-unit:
 	$(PYTHON) -m pytest -q
