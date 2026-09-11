@@ -1,0 +1,168 @@
+"""Controlled live-pilot planning and fail-closed dispatch authorization.
+
+Planning is safe without credentials. Dispatch is deliberately not performed by
+this preparation pass: a plan must contain operator-selected candidates, a
+pricing snapshot, a positive spend ceiling, and an explicit authorization record
+before any future runner may call a provider.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+import hashlib
+from pathlib import Path
+from typing import Any, Iterable, Mapping
+
+from .benchmark import load_suite, select_cases
+from .errors import ModelLabError, ValidationError
+from .schemas import canonical_record
+
+
+PILOT_PLAN_VERSION = "0.1.0"
+DEVELOPMENT_SPLIT = "train"
+DEVELOPMENT_CASE_COUNT = 36
+
+
+class PilotBlockedError(ModelLabError):
+    """A live pilot cannot dispatch under the current authorization state."""
+
+
+@dataclass(frozen=True)
+class CandidateSpec:
+    provider: str
+    model: str
+    revision: str | None = None
+
+    def to_dict(self) -> dict[str, str | None]:
+        return {"provider": self.provider, "model": self.model, "revision": self.revision}
+
+
+def parse_candidate_spec(value: str) -> CandidateSpec:
+    parts = value.split(":", 2)
+    if len(parts) < 2 or not parts[0].strip() or not parts[1].strip():
+        raise ValidationError("candidate must use provider:model[:revision]")
+    return CandidateSpec(parts[0].strip(), parts[1].strip(), parts[2].strip() or None)
+
+
+def build_pilot_plan(
+    suite_path: str | Path,
+    *,
+    candidates: Iterable[CandidateSpec] = (),
+    repeats: int = 1,
+    temperature: float | None = 0.0,
+    seed: int | None = 17,
+    max_output_tokens: int = 1200,
+    timeout_seconds: float = 60.0,
+    concurrency: int = 1,
+    max_retries: int = 0,
+    max_spend_minor: int | None = None,
+    currency: str = "USD",
+    pricing_snapshot: Mapping[str, Any] | None = None,
+    prompt_template_revision: str = "candidate-v1",
+    source_manifest: str = "docs/product_sources/SOURCE_MANIFEST.json",
+) -> dict[str, Any]:
+    suite = load_suite(suite_path)
+    selected = select_cases(suite, splits=[DEVELOPMENT_SPLIT])
+    if len(selected) != DEVELOPMENT_CASE_COUNT:
+        raise ValidationError(f"development pilot requires exactly {DEVELOPMENT_CASE_COUNT} train cases; found {len(selected)}")
+    if repeats < 1 or concurrency < 1 or max_retries < 0:
+        raise ValidationError("repeats/concurrency must be positive and max_retries non-negative")
+    if max_output_tokens < 1 or timeout_seconds <= 0:
+        raise ValidationError("output and timeout limits must be positive")
+    if max_spend_minor is not None and max_spend_minor <= 0:
+        raise ValidationError("max_spend_minor must be positive when supplied")
+    if not currency or len(currency) != 3:
+        raise ValidationError("currency must be a three-letter code")
+    candidate_list = [candidate.to_dict() for candidate in candidates]
+    frozen = {
+        "prompt_template_revision": prompt_template_revision,
+        "generation": {"temperature": temperature, "seed": seed, "max_output_tokens": max_output_tokens},
+        "execution": {"timeout_seconds": timeout_seconds, "concurrency": concurrency, "repeats": repeats, "max_retries": max_retries},
+    }
+    plan: dict[str, Any] = {
+        "plan_version": PILOT_PLAN_VERSION,
+        "status": "awaiting_operator_selection",
+        "suite_version": suite.suite_version,
+        "suite_hash": suite.source_hash,
+        "development_split": DEVELOPMENT_SPLIT,
+        "case_count": len(selected),
+        "case_ids": [case.case_id for case in selected],
+        "family_count": len({case.family_id for case in selected}),
+        "candidate_models": candidate_list,
+        "frozen_configuration": frozen,
+        "pricing_snapshot": dict(pricing_snapshot) if pricing_snapshot is not None else None,
+        "budget": {"max_spend_minor": max_spend_minor, "currency": currency, "authorization_required": True},
+        "authorization": {"paid_dispatch_allowed": False, "approved_by": None, "approved_at": None, "approved_max_spend_minor": None},
+        "routing_constraints": {
+            "recommendation_mode": "draft_only",
+            "production_router_change": False,
+            "subscription_ids": ["ananta", "yanta", "trika", "part"],
+            "entitlements_are_not_model_ids": True,
+            "no_universal_winner": True,
+            "calibration_and_holdout_untouched": True,
+            "product_source_manifest": source_manifest,
+        },
+        "provider_data_policy": {"customer_data": False, "synthetic_benchmark_only": False, "paid_calls_before_authorization": False},
+    }
+    blockers: list[str] = []
+    if not candidate_list:
+        blockers.append("operator_candidate_models_required")
+    if max_spend_minor is None:
+        blockers.append("approved_max_spend_required")
+    if pricing_snapshot is None:
+        blockers.append("pricing_snapshot_required")
+    plan["blockers"] = blockers
+    plan["ready_for_paid_dispatch"] = False
+    plan_id_input = {key: value for key, value in plan.items() if key not in {"status", "blockers", "ready_for_paid_dispatch"}}
+    plan["plan_id"] = "pilot-" + hashlib.sha256(canonical_record(plan_id_input).encode("utf-8")).hexdigest()[:24]
+    return plan
+
+
+def validate_pilot_plan(plan: Mapping[str, Any]) -> list[str]:
+    blockers = list(plan.get("blockers", []))
+    if plan.get("development_split") != DEVELOPMENT_SPLIT:
+        blockers.append("development_split_must_be_train")
+    if plan.get("case_count") != DEVELOPMENT_CASE_COUNT or len(plan.get("case_ids", [])) != DEVELOPMENT_CASE_COUNT:
+        blockers.append("pilot_must_contain_exactly_36_development_cases")
+    if plan.get("authorization", {}).get("paid_dispatch_allowed") is not True:
+        blockers.append("explicit_paid_dispatch_authorization_required")
+    if plan.get("budget", {}).get("max_spend_minor") is None:
+        blockers.append("approved_max_spend_required")
+    if plan.get("pricing_snapshot") is None:
+        blockers.append("pricing_snapshot_required")
+    if not plan.get("candidate_models"):
+        blockers.append("operator_candidate_models_required")
+    return sorted(set(blockers))
+
+
+def authorize_dispatch(plan: Mapping[str, Any], *, approved_by: str, approved_max_spend_minor: int) -> dict[str, Any]:
+    """Return an authorized copy only when an external operator explicitly supplies approval."""
+    if not approved_by.strip() or approved_max_spend_minor <= 0:
+        raise PilotBlockedError("operator identity and positive approved spend are required")
+    result = dict(plan)
+    budget = dict(result.get("budget", {}))
+    planned = budget.get("max_spend_minor")
+    if planned is None or approved_max_spend_minor > planned:
+        raise PilotBlockedError("approved spend cannot exceed the displayed plan ceiling")
+    authorization = dict(result.get("authorization", {}))
+    authorization.update({"paid_dispatch_allowed": True, "approved_by": approved_by, "approved_max_spend_minor": approved_max_spend_minor})
+    result["authorization"] = authorization
+    result["ready_for_paid_dispatch"] = not validate_pilot_plan(result)
+    result["blockers"] = validate_pilot_plan(result)
+    return result
+
+
+def require_dispatch_authorization(plan: Mapping[str, Any], *, allow_paid: bool) -> None:
+    blockers = validate_pilot_plan(plan)
+    if not allow_paid:
+        blockers.append("explicit_allow_paid_acknowledgement_required")
+    if blockers:
+        raise PilotBlockedError("live pilot blocked: " + ", ".join(sorted(set(blockers))))
+    raise PilotBlockedError("live provider dispatch is not enabled in this preparation pass")
+
+
+def write_plan(plan: Mapping[str, Any], path: str | Path) -> None:
+    destination = Path(path)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    import json
+    destination.write_text(json.dumps(plan, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")

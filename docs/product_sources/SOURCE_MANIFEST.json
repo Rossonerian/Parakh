@@ -1,0 +1,45 @@
+{
+  "manifest_version": "0.1.0",
+  "project": "Daily AI Agent",
+  "import_status": "blocked_pending_operator_documents",
+  "repository_baseline": "c9e6fe5",
+  "documents": {
+    "Architecture": {
+      "source_path": "Architecture.md",
+      "source_sha256": "f27714fbe3d21fefa1a43612b0c0c37c38a9ab23285f83a6b073408f677cfa1f",
+      "source_revision": "proposed design; no explicit document revision",
+      "available": true,
+      "imported_as_snapshot": false,
+      "note": "Root source is preserved unchanged; copy/import into docs/product_sources requires the operator source package."
+    },
+    "PRD": {
+      "available": false,
+      "source_path": null,
+      "source_revision": null,
+      "sha256": null,
+      "note": "Actual PRD was not present in the available workspace."
+    },
+    "Design": {
+      "available": false,
+      "source_path": null,
+      "source_revision": null,
+      "sha256": null,
+      "note": "Actual Design document was not present in the available workspace."
+    },
+    "Tier_Entitlements": {
+      "available": false,
+      "source_path": null,
+      "source_revision": null,
+      "sha256": null,
+      "note": "Actual Tier Entitlements document was not present in the available workspace."
+    }
+  },
+  "constraint_basis_used_for_pilot": [
+    "Rules.md",
+    "Architecture.md",
+    "Model_Testing_Spec.md",
+    "Phases.md",
+    "Acceptance_Testing.md"
+  ],
+  "integrity_rule": "Do not claim product-constraint mapping is complete until the missing source documents are imported and hashed."
+}

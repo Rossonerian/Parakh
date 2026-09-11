@@ -14,6 +14,14 @@ from .errors import IntegrityError, ModelLabError
 from .grading import grade_attempt
 from .ingestion import ingest_file
 from .pipeline import run_offline_demo
+from .pilot import (
+    PilotBlockedError,
+    build_pilot_plan,
+    parse_candidate_spec,
+    require_dispatch_authorization,
+    validate_pilot_plan,
+    write_plan,
+)
 from .promptfoo import export_promptfoo_manifest, import_promptfoo_fixture
 from .reporting import write_report_bundle
 from .review import export_blind_review, import_blind_reviews
@@ -93,6 +101,29 @@ def build_parser() -> argparse.ArgumentParser:
     promptfoo_import.add_argument("--manifest", required=True)
     promptfoo_import.add_argument("--artifact", required=True)
     promptfoo_import.add_argument("--quarantine-dir")
+
+    pilot = sub.add_parser("pilot", help="prepare and inspect a controlled development-only live pilot")
+    pilot_sub = pilot.add_subparsers(dest="pilot_command", required=True)
+    pilot_plan = pilot_sub.add_parser("plan")
+    pilot_plan.add_argument("--suite", default="benchmarks/seed_cases.jsonl")
+    pilot_plan.add_argument("--out", required=True)
+    pilot_plan.add_argument("--candidate", action="append", default=[], help="provider:model[:revision], repeatable")
+    pilot_plan.add_argument("--repeats", type=int, default=1)
+    pilot_plan.add_argument("--temperature", type=float, default=0.0)
+    pilot_plan.add_argument("--seed", type=int, default=17)
+    pilot_plan.add_argument("--max-output-tokens", type=int, default=1200)
+    pilot_plan.add_argument("--timeout-seconds", type=float, default=60.0)
+    pilot_plan.add_argument("--concurrency", type=int, default=1)
+    pilot_plan.add_argument("--max-retries", type=int, default=0)
+    pilot_plan.add_argument("--max-spend-minor", type=int)
+    pilot_plan.add_argument("--currency", default="USD")
+    pilot_plan.add_argument("--pricing-snapshot", help="JSON file or source label for the frozen pricing snapshot")
+    pilot_plan.add_argument("--prompt-template-revision", default="candidate-v1")
+    pilot_show = pilot_sub.add_parser("show")
+    pilot_show.add_argument("path")
+    pilot_run = pilot_sub.add_parser("run", help="fail-closed dispatch gate; no paid calls in this preparation pass")
+    pilot_run.add_argument("--plan", required=True)
+    pilot_run.add_argument("--allow-paid", action="store_true")
 
     review = sub.add_parser("review", help="export or import blind human review records")
     review_sub = review.add_subparsers(dest="review_command", required=True)
@@ -223,6 +254,41 @@ def main(argv: list[str] | None = None) -> int:
                 _print_json({"accepted": result.accepted, "attempts": len(result.attempts), "errors": list(result.errors), "source_hash": result.source_hash, "quarantine_path": str(result.quarantine_path) if result.quarantine_path else None})
                 return 0 if result.accepted else 2
             return 0
+        if args.command == "pilot":
+            if args.pilot_command == "plan":
+                pricing_snapshot = None
+                if args.pricing_snapshot:
+                    pricing_path = Path(args.pricing_snapshot)
+                    if pricing_path.is_file():
+                        pricing_snapshot = json.loads(pricing_path.read_text(encoding="utf-8"))
+                    else:
+                        pricing_snapshot = {"source": args.pricing_snapshot, "status": "operator_supplied_unverified"}
+                plan = build_pilot_plan(
+                    args.suite,
+                    candidates=[parse_candidate_spec(value) for value in args.candidate],
+                    repeats=args.repeats,
+                    temperature=args.temperature,
+                    seed=args.seed,
+                    max_output_tokens=args.max_output_tokens,
+                    timeout_seconds=args.timeout_seconds,
+                    concurrency=args.concurrency,
+                    max_retries=args.max_retries,
+                    max_spend_minor=args.max_spend_minor,
+                    currency=args.currency,
+                    pricing_snapshot=pricing_snapshot,
+                    prompt_template_revision=args.prompt_template_revision,
+                )
+                write_plan(plan, args.out)
+                _print_json(plan)
+                return 0
+            plan = json.loads(Path(args.path if args.pilot_command == "show" else args.plan).read_text(encoding="utf-8"))
+            if args.pilot_command == "show":
+                display = dict(plan)
+                display["current_blockers"] = validate_pilot_plan(plan)
+                _print_json(display)
+                return 0 if not display["current_blockers"] else 2
+            require_dispatch_authorization(plan, allow_paid=args.allow_paid)
+            return 2
         if args.command == "review":
             store = SQLiteStore(args.db)
             try:

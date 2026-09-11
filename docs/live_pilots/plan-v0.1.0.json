@@ -1,0 +1,37 @@
+{
+  "plan_version": "0.1.0",
+  "status": "awaiting_operator_selection",
+  "suite_version": "0.1.0",
+  "suite_hash": "9f82842371ab949a1018c5625875b1830d625d95c7b7380d5e35a172f8df230e",
+  "development_split": "train",
+  "case_count": 36,
+  "case_ids": [
+    "L1-01", "L1-02", "L1-03", "L1-06", "L1-07", "L1-08", "L1-11", "L1-12", "L1-13",
+    "L2-01", "L2-02", "L2-03", "L2-06", "L2-07", "L2-08", "L2-11", "L2-12", "L2-13",
+    "L3-01", "L3-02", "L3-03", "L3-06", "L3-07", "L3-08", "L3-11", "L3-12", "L3-13",
+    "L4-01", "L4-02", "L4-03", "L4-06", "L4-07", "L4-08", "L4-11", "L4-12", "L4-13"
+  ],
+  "family_count": 9,
+  "candidate_models": [],
+  "frozen_configuration": {
+    "prompt_template_revision": "candidate-v1",
+    "generation": {"temperature": 0.0, "seed": 17, "max_output_tokens": 1200},
+    "execution": {"timeout_seconds": 60.0, "concurrency": 1, "repeats": 1, "max_retries": 0}
+  },
+  "pricing_snapshot": null,
+  "budget": {"max_spend_minor": null, "currency": "USD", "authorization_required": true},
+  "authorization": {"paid_dispatch_allowed": false, "approved_by": null, "approved_at": null, "approved_max_spend_minor": null},
+  "routing_constraints": {
+    "recommendation_mode": "draft_only",
+    "production_router_change": false,
+    "subscription_ids": ["ananta", "yanta", "trika", "part"],
+    "entitlements_are_not_model_ids": true,
+    "no_universal_winner": true,
+    "calibration_and_holdout_untouched": true,
+    "product_source_manifest": "docs/product_sources/SOURCE_MANIFEST.json"
+  },
+  "provider_data_policy": {"customer_data": false, "synthetic_benchmark_only": false, "paid_calls_before_authorization": false},
+  "blockers": ["approved_max_spend_required", "operator_candidate_models_required", "pricing_snapshot_required"],
+  "ready_for_paid_dispatch": false,
+  "plan_id": "pilot-eae2d436d176af4df672de19"
+}
