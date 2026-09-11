@@ -73,7 +73,13 @@ Branch: `main`; integrated pilot-preparation tree: `3004c37491b90af8b88807d321b0
   case-set, model, pricing, source-manifest, and constraint-map hashes; routing
   validates every citation against the manifest and imported source bytes.
   Focused and full deterministic verification passed 60 tests. A final exact
-  tree Supervisor review remains required.
+  tree Supervisor review was requested for `20ebc9b` but the Terra runtime
+  returned a usage-limit error before reviewing. No final approval verdict is
+  claimed; this is an available-review-capacity limitation, not a waived gate.
+- After the rework and Memory commit, `make PYTHON=.venv/bin/python
+  test-release` passed with 60 tests and the 60-case offline E2E. Two further
+  disposable `make dev` runs were invoked on the final tree; both use fake
+  providers and separate `lab-data/dev.*` outputs.
 
 ## Owner inputs and boundaries
 
@@ -90,7 +96,8 @@ Branch: `main`; integrated pilot-preparation tree: `3004c37491b90af8b88807d321b0
 
 ## Next three actions
 
-1. Obtain and record the final Supervisor verdict on the exact post-rework tree.
+1. Obtain a Terra (or equivalently independent, read-only) Supervisor verdict
+   on exact commit `20ebc9b` when review capacity is available.
 2. Owner supplies a complete secure operator input: 3–5 provider:model[:revision]
    candidates, verified dated rate card/units, caps, `concurrency: 1`, ceilings,
    and named/date-stamped approved maximum spend.
