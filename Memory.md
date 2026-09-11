@@ -1,51 +1,100 @@
 # ModelLab implementation memory
 
 Updated UTC: 2026-09-11
-Branch: main (no baseline commit existed at intake)
+Branch: `main`; integrated pilot-preparation tree: `3004c37491b90af8b88807d321b06b829cdde76a`.
 
-## Verified intake
+## Verified product-source intake
 
-- Repository contained only specification files, benchmark seed data, and Codex examples; no source, tests, Python configuration, or Git commits existed.
-- Present authority read: `AGENTS.md`, `Rules.md`, `Architecture.md`, `Phases.md`, `Model_Testing_Spec.md`, `Testing_Lab_Prompt.md`, `Acceptance_Testing.md`, `benchmarks/README.md`, `benchmarks/seed_cases.jsonl`, `Agent_Team.md`.
-- Referenced `README.md`, `PRD.md`, `Design.md`, and `Tier_Entitlements.md` are absent; this is recorded as a documentation limitation, not filled with invented requirements.
-- Python 3.12.3 is available as `python3`; `python` is not installed. Runtime dependencies are intentionally standard-library-only; pytest is a development extra.
+- Supplied root files and `/home/rosso/Downloads/daily-agent-blueprint.zip`
+  were compared byte-for-byte. PRD, Architecture, Design, Tier Entitlements,
+  Rules, Phases, Acceptance Testing, Model Testing Spec, and the supporting
+  source-package documents all matched their archive members; no ambiguity was
+  found.
+- Byte-preserved snapshots are in `docs/product_sources/original/`. Current
+  source inventory, paths, source revisions, and SHA-256 values are in
+  `docs/product_sources/SOURCE_MANIFEST.json`; the append-only replacement of
+  the previous missing-source state is in `IMPORT_AUDIT.jsonl`.
+- Product source hashes for the primary routing constraints: PRD
+  `779ff523…e38d054`; Architecture `f27714fb…7cfa1f`; Design
+  `b15e81be…b03de1`; Tier Entitlements `a5951649…3c3f3a`.
+- `docs/live_pilots/router-constraint-map-v0.2.0.json` is the active
+  machine-readable draft constraint map. Its citations reference imported
+  file, heading, and source hash. It preserves plan prices/quotas, provider
+  allowlists, production cost ceilings, launch geography/channel eligibility,
+  and measured staging evidence as `UNRESOLVED_OWNER_INPUT`.
 
 ## Current implementation
 
-- Canonical dataclass contracts and validation are implemented in `model_lab/schemas.py`.
-- Seed benchmark JSONL loading, shape validation, selection, hashing, and candidate export are in `model_lab/benchmark.py`.
-- Structural candidate isolation is in `model_lab/isolation.py`; candidate payloads exclude evaluation data, split/family metadata, and annotations.
-- Dependency-free CLI currently supports `suite validate`, `suite inspect`, and protected candidate-only export.
-- Integrated storage, deterministic fake providers, execution/retry/cancellation/budget handling, structured ingestion, deterministic grading, blind review, matched comparison/regression, escaped reports/charts, Promptfoo fixture reconciliation, draft routing evidence, and optional fail-closed Ollama/OpenRouter HTTP adapters.
-- CLI now includes `init`, `doctor`, `plan`, `demo`, `run`, `import`, `grade`, `review export/import`, persisted-run `compare`, persisted-run `report`, persisted-run `audit`, `promptfoo export/import`, and `router recommend --draft`; Makefile release/dev targets are documented.
-- Controlled live-pilot preparation is in `model_lab/pilot.py` and `docs/live_pilots/`: plans select exactly the 36 `train`/development cases, freeze execution fields, require operator candidates/pricing/spend authorization, and fail closed before paid dispatch.
-- Product-source intake is tracked in `docs/product_sources/SOURCE_MANIFEST.json`; actual PRD, Design, and Tier Entitlements files were not found and were not fabricated. Router constraint mapping is explicitly partial in `docs/live_pilots/router-constraint-map-v0.1.0.md`.
+- Accepted lab safeguards remain intact: structural candidate-only isolation,
+  protected-oracle grading, immutable raw evidence, train/calibration/holdout
+  separation, fixture-only CI, budget controls, Promptfoo fixture controls,
+  and draft-only routing.
+- Strict development-only operator input and immutable plan conversion are in
+  `model_lab/operator_input.py`; template and command documentation are under
+  `docs/live_pilots/`. It requires 3–5 supported candidates, model/revision
+  metadata, dated price/unit snapshot, frozen prompt revision and execution
+  limits, `concurrency`, repeats, budgets, and named/date-stamped approval.
+  The default 36 × 3 × 2 plan has 216 base calls; retry-inclusive bound and all
+  hashes are frozen in the plan.
+- `pilot run --allow-paid` displays source/constraint/model/pricing/case hashes,
+  exact cases, max calls, retries, judge/red-team settings, and ceilings before
+  it can dispatch. It rejects incomplete plans, non-train selection,
+  unavailable provider configuration, enabled judge/red-team work, and any
+  non-`1` concurrency setting for this first runner. No live command was run.
+- Cost reservations now retain their conservative amount whenever provider
+  cost remains unknown; this avoids treating unmetered/unknown attempts as
+  free. Provider expense remains distinct from customer usage.
+- Offline post-pilot helpers exist for provider/local reconciliation with null
+  unknowns, protected critical-failure reports, calibration-only stratified
+  blind review export, explicit calibration selection, one-time frozen holdout
+  gate, and non-mutating router shadow replay.
 
-## Verified evidence
+## Evidence and handoffs
 
-- Clean editable install: `python3 -m venv .venv` and `.venv/bin/python -m pip install -e '.[dev]'` passed.
-- `make PYTHON=.venv/bin/python test-release`: doctor passed; 31 pytest tests passed; offline E2E passed.
-- Full offline demo with seed 0.1.0 and seeds 29/37: 60 cases validated, 60 attempts per synthetic candidate, non-null good-vs-incorrect delta 1.0, JSON/CSV/Markdown/HTML/SVG artifacts, accepted Promptfoo fixture, tampered fixture quarantined, router draft left production config unchanged.
-- Repeated deterministic demo with the same seed produced identical stable good/bad digests and suite hash.
-- Two consecutive `make PYTHON=.venv/bin/python dev` runs passed using distinct disposable `lab-data/dev.XXXXXX` directories.
-- `pilot show docs/live_pilots/plan-v0.1.0.json` exited 2 with the expected blockers; `pilot run --allow-paid` exited 2 without dispatching a provider call.
-- Final `git diff --check` passed and final `git status --short --branch` was clean on `main` at `48fbf74`.
+- Worker `Archimedes` (requested Luna/medium; effective runtime identity not
+  exposed) committed `791c9d1` for post-pilot gates; focused verification: 6
+  tests passed.
+- Worker `Banach` (requested Luna/medium; effective runtime identity not
+  exposed) committed `f57fd0a` for strict operator input; focused verification:
+  9 tests passed.
+- Boss integrated source constraints, dispatch preview/preflight, conservative
+  unknown-cost reservation, docs, and source import in `3004c37`.
+- On the integrated tree: `make PYTHON=.venv/bin/python test-release` passed
+  (`doctor`, 57 pytest tests, 60-case offline E2E); direct full pytest passed
+  57 tests; compileall passed; suite validation reported 60 cases, 15 families,
+  36/12/12 train/calibration/holdout; two distinct disposable `make dev` runs
+  completed using fake providers only.
+- Read-only Terra/medium Supervisor review of exact commit `3004c37` returned
+  `REWORK`: retry costs could be understated, frozen plan hashes were not
+  recomputed before dispatch, and constraint citations were not bound to bytes.
+  Requested model was `gpt-5.6-terra`; effective model identity was not exposed.
+- Commit `4004808` addresses all three findings: retry settlement remains
+  unknown unless every retry cost is known; paid preflight verifies plan,
+  case-set, model, pricing, source-manifest, and constraint-map hashes; routing
+  validates every citation against the manifest and imported source bytes.
+  Focused and full deterministic verification passed 60 tests. A final exact
+  tree Supervisor review remains required.
 
-## Review/blockers
+## Owner inputs and boundaries
 
-- Three worker handoffs were durably committed and integrated: ML-01 `0e784a2`, ML-03 `126ffe8`, ML-02 `e4b1853` (requested Luna/medium; effective worker model metadata unavailable).
-- The first requested Terra/medium read-only Supervisor attempt hit a usage-limit error. A retry on the exact corrected tree returned `APPROVED`; requested model was Terra/medium, but effective runtime model identity remained unknown.
-- The repository references `PRD.md`, `Design.md`, and `Tier_Entitlements.md`, but those files were absent at intake. No requirements were invented for them.
-- No paid provider calls, live customer data, production deployment, migrations, charges, or outbound messages were performed.
+- No paid provider calls, live provider calls, customer data, paid accounts,
+  customer messages, deployment, push, migration, or production-router changes
+  were made.
+- Root `README.md` and root PRD/Design/Tier/Sources/Start prompt files remain
+  user-supplied unstaged workspace material. Their verified source bytes were
+  imported under `docs/product_sources/original/`; do not overwrite or discard
+  the root copies.
+- Synthetic 60-case results are laboratory evidence only, never a claim of
+  real-model performance, cost, tier eligibility, or production routing
+  readiness.
 
-## Agent allocation
+## Next three actions
 
-- Boss: architecture, shared contracts, integration, canonical `Memory.md`, acceptance.
-- Supervisor: read-only independent review after integration; requested model `gpt-5.6-terra`, medium.
-- Workers: three disjoint slices; requested model `gpt-5.6-luna`, medium. Effective runtime identity must be reported from tool metadata, not prose.
-
-## Next actions
-
-1. Operator supplies the actual PRD, Design, and Tier Entitlements documents plus revision/hash metadata for import under `docs/product_sources/`.
-2. Operator supplies explicit candidate `provider:model[:revision]` values, pricing snapshot, currency, repeats, and approved maximum spend; regenerate and display the pilot plan before authorization.
-3. After the pilot, reconcile usage/cost, grade outputs, blind-review a stratified calibration sample, and keep calibration/holdout frozen until policy candidates are locked.
+1. Obtain and record the final Supervisor verdict on the exact post-rework tree.
+2. Owner supplies a complete secure operator input: 3–5 provider:model[:revision]
+   candidates, verified dated rate card/units, caps, `concurrency: 1`, ceilings,
+   and named/date-stamped approved maximum spend.
+3. Validate and freeze the plan; only then, under explicit `--allow-paid`, run
+   the development-only train pilot and execute the prepared reconciliation,
+   protected grading, calibration review, policy freeze, holdout, and shadow
+   gates.
