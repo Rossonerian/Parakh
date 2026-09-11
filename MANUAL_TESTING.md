@@ -63,7 +63,7 @@ Repeat the same fake run with the same suite hash, provider variant, configurati
 
 ## Live providers
 
-Live providers are optional and require an explicit approved run plan, bounded case/retry/output counts, timeout, concurrency, and conservative spend ceiling. Start with a small development subset and a dry-run/configuration check. Unknown pricing blocks paid scheduling unless an operator supplies a conservative bound labeled as such. Never run paid calls from CI or the default offline commands. Ollama/local execution may be used without cloud spend when its adapter is available; remote providers must remain fail-closed without credentials.
+Live providers are optional and require an explicit approved run plan, bounded case/retry/output counts, timeout, concurrency, and conservative spend ceiling. Start with a small development subset and a dry-run/configuration check. Unknown pricing blocks paid scheduling unless an operator supplies a conservative bound labeled as such. Ollama is supported through `MODELLAB_OLLAMA_ENDPOINT`; OpenRouter is supported through `OPENROUTER_API_KEY` and the optional `MODELLAB_OPENROUTER_ENDPOINT`. Both adapters preserve provider-reported token metadata, never invent cost, and fail closed when configuration is absent. Never run paid calls from CI or the default offline commands.
 
 ## Blind-review and grading CLI
 

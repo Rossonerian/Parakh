@@ -237,7 +237,11 @@ class ModelConfig:
 
     def __post_init__(self) -> None:
         require_id(self.provider, "provider")
-        require_id(self.model, "model")
+        # Provider model identifiers commonly include a namespace/path (for
+        # example ``openai/gpt-4.1``); they are still required to be a bounded,
+        # non-whitespace string but are not local record IDs.
+        if not isinstance(self.model, str) or not self.model.strip() or len(self.model) > 256 or any(char.isspace() for char in self.model):
+            raise ValidationError("model must be a bounded non-whitespace identifier")
         if not isinstance(self.parameters, dict):
             raise ValidationError("parameters must be an object")
         require_text(self.context_condition, "context_condition")
@@ -396,4 +400,3 @@ def to_dict(value: Any) -> dict[str, Any] | list[Any] | Any:
 
 def canonical_record(value: Any) -> str:
     return stable_json(_plain(value))
-
