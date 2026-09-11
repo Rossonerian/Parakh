@@ -30,11 +30,19 @@ def _id(prefix: str, *parts: str) -> str:
 
 
 class ExecutionEngine:
-    def __init__(self, store: SQLiteStore, provider: Provider, *, max_retries: int = 0, retry_delay_seconds: float = 0.0) -> None:
+    def __init__(self, store: SQLiteStore, provider: Provider, *, max_retries: int = 0,
+                 retry_delay_seconds: float = 0.0, estimated_cost_minor_per_logical_request: int | None = None,
+                 provider_timeout_seconds: float | None = None) -> None:
         if max_retries < 0:
             raise ValidationError("max_retries must be non-negative")
+        if estimated_cost_minor_per_logical_request is not None and estimated_cost_minor_per_logical_request < 0:
+            raise ValidationError("estimated_cost_minor_per_logical_request must be non-negative")
+        if provider_timeout_seconds is not None and provider_timeout_seconds <= 0:
+            raise ValidationError("provider_timeout_seconds must be positive")
         self.store, self.provider = store, provider
         self.max_retries, self.retry_delay_seconds = max_retries, retry_delay_seconds
+        self.estimated_cost_minor_per_logical_request = estimated_cost_minor_per_logical_request
+        self.provider_timeout_seconds = provider_timeout_seconds
         self.budgets = BudgetLedger(store)
 
     def execute(self, suite: Suite, run: Run, *, case_ids: Iterable[str] | None = None, splits: Iterable[str] | None = None, domains: Iterable[str] | None = None, workflows: Iterable[str] | None = None, complexity_levels: Iterable[int] | None = None, cancel_event: threading.Event | None = None) -> ExecutionResult:
@@ -59,7 +67,12 @@ class ExecutionEngine:
                 break
             logical = _id("req", run.run_id, case.case_id)
             try:
-                reservation = self.budgets.reserve(run.run_id, logical, run.budget, estimated_cost_minor=None if run.budget.max_cost_minor is None else 0)
+                reservation = self.budgets.reserve(
+                    run.run_id,
+                    logical,
+                    run.budget,
+                    estimated_cost_minor=self.estimated_cost_minor_per_logical_request if run.budget.max_cost_minor is not None else None,
+                )
             except BudgetExceededError:
                 failures += 1
                 self.store.update_run_status(run.run_id, "partial")
@@ -75,7 +88,7 @@ class ExecutionEngine:
                 input_tokens = output_tokens = cost_minor = None
                 currency = first_latency = completion_latency = None
                 try:
-                    response = self.provider.generate(ProviderRequest(candidate_input(case), run.model_config.model, run.model_config.parameters, run.budget.max_runtime_seconds, run.seed))
+                    response = self.provider.generate(ProviderRequest(candidate_input(case), run.model_config.model, run.model_config.parameters, self.provider_timeout_seconds or run.budget.max_runtime_seconds, run.seed))
                     response_text, finish_reason = response.text, response.finish_reason
                     input_tokens, output_tokens, cost_minor, currency = response.input_tokens, response.output_tokens, response.cost_minor, response.currency
                     first_latency, completion_latency, metadata = response.first_token_latency_ms, response.completion_latency_ms, dict(response.metadata)

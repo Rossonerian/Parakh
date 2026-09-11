@@ -26,7 +26,8 @@ from .schemas import stable_hash, stable_json
 SUPPORTED_PROVIDERS = frozenset({"ollama", "openrouter"})
 REQUIRED_TOP_LEVEL = frozenset({
     "schema_version", "development_only", "exclusions", "case_selection",
-    "candidates", "pricing_snapshot", "execution", "budget", "authorization",
+    "candidates", "prompt_template_revision", "pricing_snapshot", "execution",
+    "budget", "authorization",
 })
 TOP_LEVEL = REQUIRED_TOP_LEVEL
 REQUIRED_EXCLUSIONS = frozenset({
@@ -36,9 +37,13 @@ REQUIRED_RATES = frozenset({
     "input_per_million", "output_per_million", "cache_per_million",
     "reasoning_per_million", "tool_per_call",
 })
+REQUIRED_RATE_UNITS = frozenset({
+    "input_per_million", "output_per_million", "cache_per_million",
+    "reasoning_per_million", "tool_per_call",
+})
 REQUIRED_EXECUTION = frozenset({
     "max_input_tokens", "max_output_tokens", "timeout_seconds", "retry_limit",
-    "concurrency", "repeats", "temperature", "seed",
+    "concurrency", "repeats", "temperature", "seed", "judge_enabled", "red_team_enabled",
 })
 
 
@@ -284,11 +289,25 @@ def validate_operator_input(value: Mapping[str, Any], *, suite_path: str | Path)
     if len(identifiers) != len(set(identifiers)):
         _fail("candidate identifiers must be unique")
 
+    prompt_template_revision = _nonempty_string(value["prompt_template_revision"], "prompt_template_revision")
+
     pricing = _mapping(value["pricing_snapshot"], "pricing_snapshot")
-    _exact_keys(pricing, {"as_of", "currency", "source", "rates"}, "pricing_snapshot")
+    _exact_keys(pricing, {"as_of", "currency", "source", "rate_units", "rates"}, "pricing_snapshot")
     snapshot_date = _date(pricing.get("as_of"), "pricing_snapshot.as_of")
     currency = _currency(pricing.get("currency"), "pricing_snapshot.currency")
     _nonempty_string(pricing.get("source"), "pricing_snapshot.source")
+    rate_units = _mapping(pricing.get("rate_units"), "pricing_snapshot.rate_units")
+    if set(rate_units) != set(REQUIRED_RATE_UNITS):
+        _fail("pricing_snapshot.rate_units must define every price unit")
+    expected_units = {
+        "input_per_million": "currency_per_million_tokens",
+        "output_per_million": "currency_per_million_tokens",
+        "cache_per_million": "currency_per_million_tokens",
+        "reasoning_per_million": "currency_per_million_tokens",
+        "tool_per_call": "currency_per_call",
+    }
+    if any(rate_units[name] != expected_units[name] for name in expected_units):
+        _fail("pricing_snapshot.rate_units contains unsupported or missing price units")
     rates = _mapping(pricing.get("rates"), "pricing_snapshot.rates")
     if set(rates) != set(identifiers):
         _fail("pricing_snapshot.rates must contain exactly one entry per candidate identifier")
@@ -309,11 +328,18 @@ def validate_operator_input(value: Mapping[str, Any], *, suite_path: str | Path)
         "repeats": _positive_int(execution.get("repeats"), "execution.repeats"),
         "temperature": execution.get("temperature"),
         "seed": execution.get("seed"),
+        "judge_enabled": execution.get("judge_enabled"),
+        "red_team_enabled": execution.get("red_team_enabled"),
     }
     if normalized_execution["temperature"] is not None:
         _number(normalized_execution["temperature"], "execution.temperature")
     if normalized_execution["seed"] is not None:
         _nonnegative_int(normalized_execution["seed"], "execution.seed")
+
+    if not isinstance(normalized_execution["judge_enabled"], bool) or not isinstance(normalized_execution["red_team_enabled"], bool):
+        _fail("execution judge/red-team options must be boolean")
+    if normalized_execution["judge_enabled"] or normalized_execution["red_team_enabled"]:
+        _fail("paid judges and red-team calls are unsupported for the first development pilot")
 
     budget = _mapping(value["budget"], "budget")
     _exact_keys(budget, {"currency", "total_max_spend", "per_model_max_spend"}, "budget")
@@ -353,7 +379,13 @@ def validate_operator_input(value: Mapping[str, Any], *, suite_path: str | Path)
     per_call_minor: dict[str, int] = {}
     for candidate in candidates:
         rate = normalized_rates[candidate.identifier]
-        token_cost = (Decimal(normalized_execution["max_input_tokens"]) * rate["input_per_million"] + Decimal(normalized_execution["max_output_tokens"]) * (rate["output_per_million"] + rate["reasoning_per_million"] + rate["cache_per_million"])) / Decimal(1_000_000)
+        # This intentionally reserves the maximum input once as uncached and
+        # once as cached, plus maximum visible/reasoning output. It is a
+        # conservative admission bound, not an assertion about actual usage.
+        token_cost = (
+            Decimal(normalized_execution["max_input_tokens"]) * (rate["input_per_million"] + rate["cache_per_million"])
+            + Decimal(normalized_execution["max_output_tokens"]) * (rate["output_per_million"] + rate["reasoning_per_million"])
+        ) / Decimal(1_000_000)
         tool_cost = rate["tool_per_call"]
         per_call_minor[candidate.identifier] = int((token_cost + tool_cost).quantize(Decimal("0.01"), rounding=ROUND_CEILING) * 100)
     per_candidate_bound = {identifier: (per_call_minor[identifier] * len(selected) * normalized_execution["repeats"] * (normalized_execution["retry_limit"] + 1)) for identifier in identifiers}
@@ -362,6 +394,9 @@ def validate_operator_input(value: Mapping[str, Any], *, suite_path: str | Path)
     per_model_max_minor = {identifier: int((per_model[identifier] * 100).quantize(Decimal("1"), rounding=ROUND_CEILING)) for identifier in identifiers}
     if total_bound_minor > total_max_minor:
         _fail("conservative spend bound exceeds total_max_spend")
+    authorized_max_minor = int((authorized_max * 100).quantize(Decimal("1"), rounding=ROUND_CEILING))
+    if total_bound_minor > authorized_max_minor:
+        _fail("conservative spend bound exceeds the authorized maximum spend")
     for identifier, bound in per_candidate_bound.items():
         if bound > per_model_max_minor[identifier]:
             _fail(f"conservative spend bound exceeds per-model ceiling for {identifier}")
@@ -374,7 +409,8 @@ def validate_operator_input(value: Mapping[str, Any], *, suite_path: str | Path)
         "suite_hash": suite.source_hash,
         "case_ids": [case.case_id for case in selected],
         "candidates": [{"identifier": c.identifier, "provider": c.provider, "model": c.model, "display_label": c.display_label, "revision": c.revision} for c in candidates],
-        "pricing_snapshot": {"as_of": snapshot_date, "currency": currency, "source": pricing["source"], "rates": {identifier: {key: str(val) for key, val in normalized_rates[identifier].items()} for identifier in identifiers}},
+        "prompt_template_revision": prompt_template_revision,
+        "pricing_snapshot": {"as_of": snapshot_date, "currency": currency, "source": pricing["source"], "rate_units": dict(rate_units), "rates": {identifier: {key: str(val) for key, val in normalized_rates[identifier].items()} for identifier in identifiers}},
         "execution": normalized_execution,
         "budget": {"currency": currency, "total_max_spend": str(total_max), "per_model_max_spend": {key: str(value) for key, value in per_model.items()}},
         "authorization": {"operator_identity": authorization["operator_identity"], "authorized_at": authorized_at, "approved": True, "maximum_spend_authorized": str(authorized_max)},
@@ -390,6 +426,9 @@ def build_immutable_plan(value: Mapping[str, Any], *, suite_path: str | Path, so
     plan["operator_input_hash"] = stable_hash(value)
     plan["source_hash"] = source_hash
     plan["constraint_hash"] = constraint_hash
+    plan["case_set_hash"] = stable_hash(plan["case_ids"])
+    plan["model_configuration_hash"] = stable_hash({"candidates": plan["candidates"], "execution": plan["execution"], "prompt_template_revision": plan["prompt_template_revision"]})
+    plan["pricing_snapshot_hash"] = stable_hash(plan["pricing_snapshot"])
     plan["immutable"] = True
     plan["plan_hash"] = hashlib.sha256(stable_json(plan).encode("utf-8")).hexdigest()
     return plan

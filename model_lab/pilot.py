@@ -15,7 +15,7 @@ from typing import Any, Iterable, Mapping
 
 from .benchmark import load_suite, select_cases
 from .errors import ModelLabError, ValidationError
-from .schemas import canonical_record
+from .schemas import Budget, ModelConfig, Run, canonical_record, stable_hash, utc_now
 
 
 PILOT_PLAN_VERSION = "0.1.0"
@@ -119,13 +119,33 @@ def build_pilot_plan(
 
 
 def validate_pilot_plan(plan: Mapping[str, Any]) -> list[str]:
+    if plan.get("immutable") is True:
+        blockers: list[str] = []
+        if plan.get("development_only") is not True:
+            blockers.append("development_only_declaration_required")
+        exclusions = plan.get("exclusions")
+        if not isinstance(exclusions, Mapping) or any(exclusions.get(key) is not True for key in ("customer_data", "calibration_holdout", "production_router_changes", "external_actions")):
+            blockers.append("development_only_exclusions_required")
+        if len(plan.get("case_ids", [])) != DEVELOPMENT_CASE_COUNT:
+            blockers.append("pilot_must_contain_exactly_36_development_cases")
+        if not isinstance(plan.get("candidates"), list) or not 3 <= len(plan["candidates"]) <= 5:
+            blockers.append("three_to_five_candidate_models_required")
+        if not isinstance(plan.get("pricing_snapshot"), Mapping) or not plan.get("pricing_snapshot_hash"):
+            blockers.append("pricing_snapshot_required")
+        if not isinstance(plan.get("budget"), Mapping) or not plan["budget"].get("total_max_spend"):
+            blockers.append("approved_max_spend_required")
+        authorization = plan.get("authorization")
+        if not isinstance(authorization, Mapping) or authorization.get("approved") is not True or not authorization.get("operator_identity") or not authorization.get("authorized_at"):
+            blockers.append("explicit_paid_dispatch_authorization_required")
+        for name in ("source_hash", "constraint_hash", "model_configuration_hash", "pricing_snapshot_hash", "case_set_hash", "plan_hash"):
+            if not plan.get(name):
+                blockers.append(f"{name}_required")
+        return sorted(set(blockers))
     blockers = list(plan.get("blockers", []))
     if plan.get("development_split") != DEVELOPMENT_SPLIT:
         blockers.append("development_split_must_be_train")
     if plan.get("case_count") != DEVELOPMENT_CASE_COUNT or len(plan.get("case_ids", [])) != DEVELOPMENT_CASE_COUNT:
         blockers.append("pilot_must_contain_exactly_36_development_cases")
-    if plan.get("authorization", {}).get("paid_dispatch_allowed") is not True:
-        blockers.append("explicit_paid_dispatch_authorization_required")
     if plan.get("budget", {}).get("max_spend_minor") is None:
         blockers.append("approved_max_spend_required")
     if plan.get("pricing_snapshot") is None:
@@ -158,7 +178,114 @@ def require_dispatch_authorization(plan: Mapping[str, Any], *, allow_paid: bool)
         blockers.append("explicit_allow_paid_acknowledgement_required")
     if blockers:
         raise PilotBlockedError("live pilot blocked: " + ", ".join(sorted(set(blockers))))
-    raise PilotBlockedError("live provider dispatch is not enabled in this preparation pass")
+
+
+def dispatch_preview(plan: Mapping[str, Any]) -> dict[str, Any]:
+    """Return the exact evidence displayed immediately before any dispatch."""
+    immutable = plan.get("immutable") is True
+    execution = plan.get("execution", {}) if immutable else plan.get("frozen_configuration", {}).get("execution", {})
+    generation = plan.get("execution", {}) if immutable else plan.get("frozen_configuration", {}).get("generation", {})
+    return {
+        "dispatch_preview": True,
+        "plan_hash": plan.get("plan_hash") or plan.get("plan_id"),
+        "source_hash": plan.get("source_hash"),
+        "constraint_hash": plan.get("constraint_hash"),
+        "model_configuration_hash": plan.get("model_configuration_hash"),
+        "pricing_snapshot_hash": plan.get("pricing_snapshot_hash"),
+        "case_set_hash": plan.get("case_set_hash"),
+        "case_ids": list(plan.get("case_ids", [])),
+        "candidate_models": plan.get("candidates") if immutable else plan.get("candidate_models", []),
+        "base_calls": plan.get("bounds", {}).get("base_calls"),
+        "maximum_calls": plan.get("bounds", {}).get("maximum_calls"),
+        "retry_limit": execution.get("retry_limit", execution.get("max_retries")),
+        "repeats": execution.get("repeats"),
+        "concurrency": execution.get("concurrency"),
+        "timeout_seconds": execution.get("timeout_seconds"),
+        "max_output_tokens": generation.get("max_output_tokens"),
+        "judge_enabled": execution.get("judge_enabled", False),
+        "red_team_enabled": execution.get("red_team_enabled", False),
+        "budget": plan.get("budget"),
+        "dispatch_performed": False,
+    }
+
+
+def _provider_for(candidate: Mapping[str, Any]):
+    import os
+
+    provider = candidate["provider"]
+    model = candidate["model"]
+    if provider == "ollama":
+        if not os.environ.get("MODELLAB_OLLAMA_ENDPOINT"):
+            raise PilotBlockedError("ollama disabled: missing MODELLAB_OLLAMA_ENDPOINT")
+        from .providers.live import OllamaProvider
+        return OllamaProvider(model)
+    if provider == "openrouter":
+        if not os.environ.get("OPENROUTER_API_KEY"):
+            raise PilotBlockedError("openrouter disabled: missing OPENROUTER_API_KEY")
+        from .providers.live import OpenRouterProvider
+        return OpenRouterProvider(model)
+    raise PilotBlockedError(f"unsupported pilot provider: {provider}")
+
+
+def run_authorized_immutable_pilot(plan: Mapping[str, Any], *, suite_path: str | Path, output_dir: str | Path) -> dict[str, Any]:
+    """Execute a validated, authorized development plan; never alters app routing.
+
+    This path is intentionally unavailable to incomplete plans.  It is not used
+    by fixture CI and is not invoked in this repository verification pass.
+    """
+    if plan.get("immutable") is not True:
+        raise PilotBlockedError("paid pilot execution requires an immutable operator plan")
+    require_dispatch_authorization(plan, allow_paid=True)
+    execution = plan["execution"]
+    if execution["concurrency"] != 1:
+        raise PilotBlockedError("live pilot runner currently supports concurrency=1 only")
+    if execution.get("judge_enabled") or execution.get("red_team_enabled"):
+        raise PilotBlockedError("judge and red-team dispatch are disabled for the first development pilot")
+    suite = load_suite(suite_path)
+    if suite.suite_version != plan.get("suite_version") or suite.source_hash != plan.get("suite_hash"):
+        raise PilotBlockedError("benchmark version/hash does not match frozen plan")
+    case_ids = tuple(plan["case_ids"])
+    if len(case_ids) != DEVELOPMENT_CASE_COUNT or any(case.split != DEVELOPMENT_SPLIT for case in select_cases(suite, case_ids=case_ids)):
+        raise PilotBlockedError("frozen plan contains non-train cases")
+
+    from .execution import ExecutionEngine
+    from .storage import SQLiteStore
+
+    destination = Path(output_dir)
+    # Verify every provider configuration before persisting a run or issuing a
+    # single paid request; no partial model set is an authorized experiment.
+    providers = {candidate["identifier"]: _provider_for(candidate) for candidate in plan["candidates"]}
+    store = SQLiteStore(destination / "model_lab.sqlite3")
+    results: list[dict[str, Any]] = []
+    try:
+        for candidate_index, candidate in enumerate(plan["candidates"]):
+            per_call = int(plan["bounds"]["per_call_bound_minor"][candidate["identifier"]])
+            per_logical = per_call * (int(execution["retry_limit"]) + 1)
+            for repeat_index in range(int(execution["repeats"])):
+                run_id = "pilot-" + stable_hash({"plan": plan["plan_hash"], "candidate": candidate["identifier"], "repeat": repeat_index})[:24]
+                parameters: dict[str, Any] = {"temperature": execution["temperature"], "max_tokens": execution["max_output_tokens"]}
+                if candidate["provider"] == "ollama":
+                    parameters["num_predict"] = execution["max_output_tokens"]
+                run = Run(
+                    run_id=run_id,
+                    suite_version=suite.suite_version,
+                    case_ids=case_ids,
+                    model_config=ModelConfig(candidate["provider"], candidate["model"], revision=candidate.get("revision"), parameters=parameters),
+                    seed=execution["seed"],
+                    budget=Budget(max_cases=DEVELOPMENT_CASE_COUNT, max_requests=DEVELOPMENT_CASE_COUNT,
+                                  max_runtime_seconds=float(execution["timeout_seconds"]) * DEVELOPMENT_CASE_COUNT * (int(execution["retry_limit"]) + 1),
+                                  max_cost_minor=per_logical * DEVELOPMENT_CASE_COUNT, currency=plan["budget"]["currency"]),
+                    started_at=utc_now(),
+                    environment={"mode": "development_live_authorized", "plan_hash": plan["plan_hash"], "source_hash": str(plan["source_hash"]), "constraint_hash": str(plan["constraint_hash"]), "customer_data": "false", "production_router_change": "false"},
+                )
+                engine = ExecutionEngine(store, providers[candidate["identifier"]], max_retries=int(execution["retry_limit"]),
+                                         estimated_cost_minor_per_logical_request=per_logical,
+                                         provider_timeout_seconds=float(execution["timeout_seconds"]))
+                result = engine.execute(suite, run, case_ids=case_ids)
+                results.append({"run_id": result.run_id, "candidate_index": candidate_index, "candidate": candidate["identifier"], "repeat": repeat_index + 1, "status": result.status, "attempts": len(result.attempts), "failures": result.failures})
+    finally:
+        store.close()
+    return {"plan_hash": plan["plan_hash"], "results": results, "dispatch_performed": True, "production_config_changed": False, "customer_data_used": False}
 
 
 def write_plan(plan: Mapping[str, Any], path: str | Path) -> None:

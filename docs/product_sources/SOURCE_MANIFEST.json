@@ -1,45 +1,31 @@
 {
-  "manifest_version": "0.1.0",
+  "manifest_version": "0.2.0",
   "project": "Daily AI Agent",
-  "import_status": "blocked_pending_operator_documents",
-  "repository_baseline": "c9e6fe5",
-  "documents": {
-    "Architecture": {
-      "source_path": "Architecture.md",
-      "source_sha256": "f27714fbe3d21fefa1a43612b0c0c37c38a9ab23285f83a6b073408f677cfa1f",
-      "source_revision": "proposed design; no explicit document revision",
-      "available": true,
-      "imported_as_snapshot": false,
-      "note": "Root source is preserved unchanged; copy/import into docs/product_sources requires the operator source package."
-    },
-    "PRD": {
-      "available": false,
-      "source_path": null,
-      "source_revision": null,
-      "sha256": null,
-      "note": "Actual PRD was not present in the available workspace."
-    },
-    "Design": {
-      "available": false,
-      "source_path": null,
-      "source_revision": null,
-      "sha256": null,
-      "note": "Actual Design document was not present in the available workspace."
-    },
-    "Tier_Entitlements": {
-      "available": false,
-      "source_path": null,
-      "source_revision": null,
-      "sha256": null,
-      "note": "Actual Tier Entitlements document was not present in the available workspace."
-    }
+  "import_status": "verified",
+  "repository_baseline": "7aed5dcbad52adc33e570e104b18479d57c5517b",
+  "imported_at_utc": "2026-09-11T10:44:43Z",
+  "source_package": {
+    "path": "/home/rosso/Downloads/daily-agent-blueprint.zip",
+    "sha256": "233fd94b3c76e348d733a8b0a303f29c2c35748e06136f48b4454654563d9095",
+    "comparison": "archive members and supplied repository copies are byte-identical"
   },
-  "constraint_basis_used_for_pilot": [
-    "Rules.md",
-    "Architecture.md",
-    "Model_Testing_Spec.md",
-    "Phases.md",
-    "Acceptance_Testing.md"
-  ],
-  "integrity_rule": "Do not claim product-constraint mapping is complete until the missing source documents are imported and hashed."
+  "documents": {
+    "PRD": {"source_path": "PRD.md", "archive_member": "daily-agent-blueprint/PRD.md", "imported_path": "docs/product_sources/original/PRD.md", "source_sha256": "779ff5233b642a1571fcf42b5d756a834039c66a7ca987f9e94acda87e38d054", "source_revision": "Status: implementation specification; core v1; names and prices require product validation", "available": true},
+    "Architecture": {"source_path": "Architecture.md", "archive_member": "daily-agent-blueprint/Architecture.md", "imported_path": "docs/product_sources/original/Architecture.md", "source_sha256": "f27714fbe3d21fefa1a43612b0c0c37c38a9ab23285f83a6b073408f677cfa1f", "source_revision": "Status: proposed design", "available": true},
+    "Design": {"source_path": "Design.md", "archive_member": "daily-agent-blueprint/Design.md", "imported_path": "docs/product_sources/original/Design.md", "source_sha256": "b15e81bee26c5953c078715eb7d4d2756454a9145e5ed665619cdaf859b03de1", "source_revision": "Proposed design system v1; 2026-09-09", "available": true},
+    "Tier_Entitlements": {"source_path": "Tier_Entitlements.md", "archive_member": "daily-agent-blueprint/Tier_Entitlements.md", "imported_path": "docs/product_sources/original/Tier_Entitlements.md", "source_sha256": "a5951649ce9070d96c14d9e5709116905da5381dafc894bcd96b95887d3c3f3a", "source_revision": "Draft engineering policy; 2026-09-09", "available": true},
+    "Rules": {"source_path": "Rules.md", "archive_member": "daily-agent-blueprint/Rules.md", "imported_path": "docs/product_sources/original/Rules.md", "source_sha256": "bbf8e4dca1eb9246865f2c0f66bb07d694d6cafc6a6befd99deb7ae877787c36", "source_revision": "Specification v1; 2026-09-09", "available": true},
+    "Phases": {"source_path": "Phases.md", "archive_member": "daily-agent-blueprint/Phases.md", "imported_path": "docs/product_sources/original/Phases.md", "source_sha256": "6b85cc543c90b709fdce7ce61f74140eeae707d60e5d093e6260d27b2da9512f", "source_revision": "Status: executable sequence", "available": true},
+    "Acceptance_Testing": {"source_path": "Acceptance_Testing.md", "archive_member": "daily-agent-blueprint/Acceptance_Testing.md", "imported_path": "docs/product_sources/original/Acceptance_Testing.md", "source_sha256": "5a9402a24de5eae96e067fee522225a1c4683cb59e9c5094a38c1cf3d93fd7bc", "source_revision": "Proposed contract; 2026-09-09", "available": true},
+    "Model_Testing_Spec": {"source_path": "Model_Testing_Spec.md", "archive_member": "daily-agent-blueprint/Model_Testing_Spec.md", "imported_path": "docs/product_sources/original/Model_Testing_Spec.md", "source_sha256": "a516d42bb817f5d2fdcb6e1d481c3c11863e6659ae8d6c448dbdc3d3e157df35", "source_revision": "Status: proposed implementation specification; 60 authored test cases; no paid calls authorized", "available": true},
+    "AGENTS": {"source_path": "AGENTS.md", "archive_member": "daily-agent-blueprint/AGENTS.md", "imported_path": "docs/product_sources/original/AGENTS.md", "source_sha256": "dd33238453698a298f41bcc63279a5d4cdbd49af9c465fb3e5c643084c6432cd", "source_revision": "Project agent instructions", "available": true},
+    "Agent_Team": {"source_path": "Agent_Team.md", "archive_member": "daily-agent-blueprint/Agent_Team.md", "imported_path": "docs/product_sources/original/Agent_Team.md", "source_sha256": "e3286bdd1ba991cd4a2a45297b44a644e9c73a30b55087657fe7379ef36e619b", "source_revision": "Updated 2026-09-10", "available": true},
+    "Sources": {"source_path": "Sources.md", "archive_member": "daily-agent-blueprint/Sources.md", "imported_path": "docs/product_sources/original/Sources.md", "source_sha256": "1882ec96a6b39e568563b0c9dbea18e0be4bad034fc45aaec9e58cb97e0d27bb", "source_revision": "Checked 2026-09-09", "available": true},
+    "Start_Project_Prompt": {"source_path": "Start_Project_Prompt.md", "archive_member": "daily-agent-blueprint/Start_Project_Prompt.md", "imported_path": "docs/product_sources/original/Start_Project_Prompt.md", "source_sha256": "4e7e970832fcaf5c8b4a3bc608cc4ecef337916812c6389b805fc3b5ef49204a", "source_revision": "Codex implementation prompt", "available": true},
+    "Testing_Lab_Prompt": {"source_path": "Testing_Lab_Prompt.md", "archive_member": "daily-agent-blueprint/Testing_Lab_Prompt.md", "imported_path": "docs/product_sources/original/Testing_Lab_Prompt.md", "source_sha256": "30e60725c30b1afcbbf95e2f6c2d37b70e00a98c7039592bd8a0ad561089f78d", "source_revision": "Copy-paste ModelLab implementation prompt", "available": true},
+    "README": {"source_path": "README.md", "archive_member": "daily-agent-blueprint/README.md", "imported_path": "docs/product_sources/original/README.md", "source_sha256": "db00d2aeb0bf415388a88f29582a1c2985a06cb374652a36deef5ec361ab4960", "source_revision": "Prepared 2026-09-09; project blueprint", "available": true}
+  },
+  "constraint_mapping_status": "verified_from_imported_sources",
+  "ambiguity": {"status": "none", "evidence": "root files and archive members have identical SHA-256 values"},
+  "prior_missing_record": "SOURCE_MANIFEST.json@0.1.0 in baseline 7aed5dc recorded PRD, Design and Tier_Entitlements as unavailable; the append-only import audit records this replacement."
 }

@@ -60,6 +60,16 @@ def test_budget_requires_known_cost_when_finite_cost_cap():
     assert store.connection.execute("SELECT state, actual_cost_minor FROM budget_reservations WHERE reservation_id = ?", (reservation.reservation_id,)).fetchone()[0] == "unknown"
 
 
+def test_unknown_provider_cost_keeps_its_conservative_reservation():
+    store = SQLiteStore()
+    _, run = setup_run(store)
+    ledger = BudgetLedger(store)
+    reservation = ledger.reserve(run.run_id, "request-one", Budget(max_cost_minor=10, currency="USD"), estimated_cost_minor=6)
+    ledger.settle(reservation, actual_cost_minor=None)
+    with pytest.raises(BudgetExceededError, match="cost budget exhausted"):
+        ledger.reserve(run.run_id, "request-two", Budget(max_cost_minor=10, currency="USD"), estimated_cost_minor=5)
+
+
 def test_csv_import(tmp_path):
     store = SQLiteStore()
     suite, run = setup_run(store)

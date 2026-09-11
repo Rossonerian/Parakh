@@ -183,7 +183,14 @@ class SQLiteStore:
                     raise ValidationError("request budget exhausted")
                 if max_cost_minor is not None and estimated_cost_minor is None:
                     raise ValidationError("finite cost budget requires a known reservation")
-                reserved_cost = self.connection.execute("SELECT COALESCE(SUM(reserved_cost_minor), 0) FROM budget_reservations WHERE run_id = ? AND state = 'reserved'", (run_id,)).fetchone()[0]
+                reserved_cost = self.connection.execute("""
+                    SELECT COALESCE(SUM(CASE
+                        WHEN state = 'released' THEN 0
+                        WHEN state = 'settled' THEN COALESCE(actual_cost_minor, reserved_cost_minor)
+                        ELSE reserved_cost_minor
+                    END), 0)
+                    FROM budget_reservations WHERE run_id = ?
+                """, (run_id,)).fetchone()[0]
                 if max_cost_minor is not None and reserved_cost + estimated_cost_minor > max_cost_minor:
                     raise ValidationError("cost budget exhausted")
                 self.connection.execute("INSERT INTO budget_reservations VALUES (?, ?, ?, 1, ?, NULL, ?, 'reserved', ?)", (reservation_id, run_id, logical_request_id, estimated_cost_minor, currency, created_at))

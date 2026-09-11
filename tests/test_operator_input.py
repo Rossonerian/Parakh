@@ -58,6 +58,8 @@ def test_valid_input_is_train_only_and_has_conservative_bounds():
     assert plan["bounds"]["maximum_calls"] == 432
     assert plan["bounds"]["total_bound_minor"] <= 1000
     assert plan["immutable"] is True
+    assert plan["pricing_snapshot_hash"]
+    assert plan["model_configuration_hash"]
     assert len(plan["plan_hash"]) == 64
 
 
@@ -65,6 +67,8 @@ def test_valid_input_is_train_only_and_has_conservative_bounds():
     (lambda x: x["candidates"].append(deepcopy(x["candidates"][0])), "unique"),
     (lambda x: x["budget"].update({"currency": "EUR"}), "currencies"),
     (lambda x: x["execution"].update({"max_output_tokens": 0}), "positive"),
+    (lambda x: x["pricing_snapshot"].pop("rate_units"), "rate_units"),
+    (lambda x: x["authorization"].update({"maximum_spend_authorized": 0.01}), "authorized maximum"),
     (lambda x: x["case_selection"].update({"split": "holdout"}), "train split"),
     (lambda x: x["authorization"].update({"approved": False}), "authorization"),
 ])

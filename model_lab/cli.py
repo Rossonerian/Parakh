@@ -10,15 +10,19 @@ import sys
 
 from .benchmark import export_candidate_jsonl, load_suite, validate_suite
 from .analysis import compare_grades
+from .constraints import evaluate_constraints, file_sha256, load_constraint_map
 from .errors import IntegrityError, ModelLabError
 from .grading import grade_attempt
 from .ingestion import ingest_file
+from .operator_input import build_immutable_plan, load_operator_input, validate_operator_input, write_immutable_plan
 from .pipeline import run_offline_demo
 from .pilot import (
     PilotBlockedError,
     build_pilot_plan,
+    dispatch_preview,
     parse_candidate_spec,
     require_dispatch_authorization,
+    run_authorized_immutable_pilot,
     validate_pilot_plan,
     write_plan,
 )
@@ -104,11 +108,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     pilot = sub.add_parser("pilot", help="prepare and inspect a controlled development-only live pilot")
     pilot_sub = pilot.add_subparsers(dest="pilot_command", required=True)
+    pilot_validate = pilot_sub.add_parser("validate-input", help="validate operator input without dispatch")
+    pilot_validate.add_argument("--input", required=True, dest="operator_input")
+    pilot_validate.add_argument("--suite", default="benchmarks/seed_cases.jsonl")
     pilot_plan = pilot_sub.add_parser("plan")
     pilot_plan.add_argument("--suite", default="benchmarks/seed_cases.jsonl")
     pilot_plan.add_argument("--out", required=True)
+    pilot_plan.add_argument("--operator-input", help="complete operator YAML; converts to an immutable plan")
+    pilot_plan.add_argument("--constraint-map", default="docs/live_pilots/router-constraint-map-v0.2.0.json")
+    pilot_plan.add_argument("--source-manifest", default="docs/product_sources/SOURCE_MANIFEST.json")
     pilot_plan.add_argument("--candidate", action="append", default=[], help="provider:model[:revision], repeatable")
-    pilot_plan.add_argument("--repeats", type=int, default=1)
+    pilot_plan.add_argument("--repeats", type=int, default=2)
     pilot_plan.add_argument("--temperature", type=float, default=0.0)
     pilot_plan.add_argument("--seed", type=int, default=17)
     pilot_plan.add_argument("--max-output-tokens", type=int, default=1200)
@@ -124,6 +134,8 @@ def build_parser() -> argparse.ArgumentParser:
     pilot_run = pilot_sub.add_parser("run", help="fail-closed dispatch gate; no paid calls in this preparation pass")
     pilot_run.add_argument("--plan", required=True)
     pilot_run.add_argument("--allow-paid", action="store_true")
+    pilot_run.add_argument("--suite", default="benchmarks/seed_cases.jsonl")
+    pilot_run.add_argument("--out", default="lab-data/live-pilots")
 
     review = sub.add_parser("review", help="export or import blind human review records")
     review_sub = review.add_subparsers(dest="review_command", required=True)
@@ -143,6 +155,7 @@ def build_parser() -> argparse.ArgumentParser:
     recommend.add_argument("--summary", default="lab-data/demo/summary.json")
     recommend.add_argument("--out")
     recommend.add_argument("--draft", action="store_true", default=False)
+    recommend.add_argument("--constraint-map", default="docs/live_pilots/router-constraint-map-v0.2.0.json")
     return parser
 
 
@@ -255,7 +268,20 @@ def main(argv: list[str] | None = None) -> int:
                 return 0 if result.accepted else 2
             return 0
         if args.command == "pilot":
+            if args.pilot_command == "validate-input":
+                value = load_operator_input(args.operator_input)
+                normalized = validate_operator_input(value, suite_path=args.suite)
+                _print_json({"valid": True, "suite_version": normalized["suite_version"], "case_count": len(normalized["case_ids"]), "candidate_count": len(normalized["candidates"]), "bounds": normalized["bounds"], "dispatch_performed": False})
+                return 0
             if args.pilot_command == "plan":
+                if args.operator_input:
+                    value = load_operator_input(args.operator_input)
+                    source_hash = file_sha256(args.source_manifest)
+                    constraint_hash = file_sha256(args.constraint_map)
+                    plan = build_immutable_plan(value, suite_path=args.suite, source_hash=source_hash, constraint_hash=constraint_hash)
+                    write_immutable_plan(plan, args.out)
+                    _print_json(plan)
+                    return 0
                 pricing_snapshot = None
                 if args.pricing_snapshot:
                     pricing_path = Path(args.pricing_snapshot)
@@ -287,8 +313,10 @@ def main(argv: list[str] | None = None) -> int:
                 display["current_blockers"] = validate_pilot_plan(plan)
                 _print_json(display)
                 return 0 if not display["current_blockers"] else 2
+            _print_json(dispatch_preview(plan))
             require_dispatch_authorization(plan, allow_paid=args.allow_paid)
-            return 2
+            _print_json(run_authorized_immutable_pilot(plan, suite_path=args.suite, output_dir=args.out))
+            return 0
         if args.command == "review":
             store = SQLiteStore(args.db)
             try:
@@ -312,10 +340,18 @@ def main(argv: list[str] | None = None) -> int:
             source = Path(args.summary)
             value = json.loads(source.read_text(encoding="utf-8"))
             recommendations = value.get("routing_recommendations", [])
+            constraint_map = load_constraint_map(args.constraint_map)
+            constraint_evaluation = evaluate_constraints(constraint_map)
+            constraint_evaluation["source_manifest_sha256"] = constraint_map.get("source_manifest_sha256")
+            constraint_evaluation["constraint_map_sha256"] = file_sha256(args.constraint_map)
+            activation_ready = bool(constraint_evaluation["activation_ready"]) and not any(item.get("synthetic") for item in recommendations)
+            result = {"draft": True, "activation_ready": activation_ready, "recommendations": recommendations,
+                      "constraint_evaluation": constraint_evaluation, "production_config_changed": False,
+                      "limitations": ["Draft evidence cannot activate production routing."]}
             if args.out:
-                Path(args.out).write_text(json.dumps(recommendations, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
-            _print_json({"draft": True, "recommendations": recommendations, "production_config_changed": False})
-            return 0
+                _write_json(args.out, result)
+            _print_json(result)
+            return 0 if activation_ready else 2
         if args.command in {"grade", "compare", "report", "audit"}:
             if args.command == "grade" and args.db and args.suite and args.run_id:
                 suite = load_suite(args.suite)

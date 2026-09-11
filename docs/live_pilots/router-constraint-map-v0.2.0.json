@@ -1,0 +1,143 @@
+{
+  "schema_version": "router-constraint-map/0.2.0",
+  "generated_at_utc": "2026-09-11T10:44:43Z",
+  "source_manifest": "docs/product_sources/SOURCE_MANIFEST.json",
+  "source_manifest_sha256": "33f04ed157c1f6e1a94c4b165a4be4a26f8180a91a64cd06189b387d5a54c651",
+  "status": "draft_only",
+  "activation_policy": "A draft recommendation is never activation-ready while any required constraint is unresolved, unavailable, or blocking.",
+  "constraints": [
+    {
+      "id": "entitlement.canonical_ids",
+      "category": "entitlements",
+      "requirement": "Customer subscription IDs are exactly ananta, yanta, trika, and part; they are not model identifiers.",
+      "status": "satisfied",
+      "value": ["ananta", "yanta", "trika", "part"],
+      "required_for_activation": true,
+      "citations": [
+        {"source_file": "docs/product_sources/original/PRD.md", "section": "1. Product and customer", "source_sha256": "779ff5233b642a1571fcf42b5d756a834039c66a7ca987f9e94acda87e38d054"},
+        {"source_file": "docs/product_sources/original/Tier_Entitlements.md", "section": "Document heading and Two views of the same plan", "source_sha256": "a5951649ce9070d96c14d9e5709116905da5381dafc894bcd96b95887d3c3f3a"}
+      ]
+    },
+    {
+      "id": "admission.plan_limits",
+      "category": "admission",
+      "requirement": "Eligibility must be evaluated against versioned plan, working-input/output, usage, request, concurrency, and monetary limits before execution.",
+      "status": "satisfied",
+      "value": "server_owned_versioned_policy_required",
+      "required_for_activation": true,
+      "citations": [
+        {"source_file": "docs/product_sources/original/PRD.md", "section": "4. Requirements and acceptance; 5. Subscription policy", "source_sha256": "779ff5233b642a1571fcf42b5d756a834039c66a7ca987f9e94acda87e38d054"},
+        {"source_file": "docs/product_sources/original/Tier_Entitlements.md", "section": "Required versioned configuration; Admission before execution", "source_sha256": "a5951649ce9070d96c14d9e5709116905da5381dafc894bcd96b95887d3c3f3a"},
+        {"source_file": "docs/product_sources/original/Architecture.md", "section": "2. Request lifecycle; 6. Accounting and concurrency", "source_sha256": "f27714fbe3d21fefa1a43612b0c0c37c38a9ab23285f83a6b073408f677cfa1f"}
+      ]
+    },
+    {
+      "id": "admission.no_automatic_paid_access",
+      "category": "admission",
+      "requirement": "No automatic paid-tier access, upgrades, customer charges, artificial degradation, unlimited retries, or premium guarantee.",
+      "status": "satisfied",
+      "value": "explicit_denial_required",
+      "required_for_activation": true,
+      "citations": [
+        {"source_file": "docs/product_sources/original/PRD.md", "section": "5. Subscription policy; 6. Representative journeys", "source_sha256": "779ff5233b642a1571fcf42b5d756a834039c66a7ca987f9e94acda87e38d054"},
+        {"source_file": "docs/product_sources/original/Tier_Entitlements.md", "section": "Exhaustion and recovery", "source_sha256": "a5951649ce9070d96c14d9e5709116905da5381dafc894bcd96b95887d3c3f3a"}
+      ]
+    },
+    {
+      "id": "admission.paid_attempt_reservation",
+      "category": "financial_safety",
+      "requirement": "Reserve worst-case bounded cost atomically before each paid model, classifier, judge, tool, retrieval, transcription, synthesis, or delivery attempt.",
+      "status": "satisfied",
+      "value": "reservation_before_chargeable_execution",
+      "required_for_activation": true,
+      "citations": [
+        {"source_file": "docs/product_sources/original/PRD.md", "section": "4. Requirements and acceptance; 7. Success measures and economics", "source_sha256": "779ff5233b642a1571fcf42b5d756a834039c66a7ca987f9e94acda87e38d054"},
+        {"source_file": "docs/product_sources/original/Tier_Entitlements.md", "section": "Admission before execution", "source_sha256": "a5951649ce9070d96c14d9e5709116905da5381dafc894bcd96b95887d3c3f3a"}
+      ]
+    },
+    {
+      "id": "accounting.separate_ledgers",
+      "category": "accounting",
+      "requirement": "Keep customer usage and provider expenditure in distinct immutable ledgers; unknown usage/cost remains unknown and is reconciled later.",
+      "status": "satisfied",
+      "value": "customer_usage_ledger_and_provider_expense_ledger",
+      "required_for_activation": true,
+      "citations": [
+        {"source_file": "docs/product_sources/original/Architecture.md", "section": "6. Accounting and concurrency", "source_sha256": "f27714fbe3d21fefa1a43612b0c0c37c38a9ab23285f83a6b073408f677cfa1f"},
+        {"source_file": "docs/product_sources/original/Tier_Entitlements.md", "section": "Admission before execution; Correct units", "source_sha256": "a5951649ce9070d96c14d9e5709116905da5381dafc894bcd96b95887d3c3f3a"}
+      ]
+    },
+    {
+      "id": "routing.eligibility_filters",
+      "category": "routing",
+      "requirement": "Filter task/domain, context fit, tools, privacy/retention, region/channel eligibility, plan allowlist, health, and measured evidence before route selection.",
+      "status": "satisfied",
+      "value": "all_required_filters_precede_model_selection",
+      "required_for_activation": true,
+      "citations": [
+        {"source_file": "docs/product_sources/original/PRD.md", "section": "4. Requirements and acceptance (REQ-ROUTE-001 and REQ-ROUTE-002)", "source_sha256": "779ff5233b642a1571fcf42b5d756a834039c66a7ca987f9e94acda87e38d054"},
+        {"source_file": "docs/product_sources/original/Architecture.md", "section": "5. Routing and evaluation", "source_sha256": "f27714fbe3d21fefa1a43612b0c0c37c38a9ab23285f83a6b073408f677cfa1f"}
+      ]
+    },
+    {
+      "id": "routing.bounded_recovery",
+      "category": "execution",
+      "requirement": "Recovery is bounded; final states include ask, safe stop, or deferred/unresolved, and exhausted escalation cannot become successful delivery.",
+      "status": "satisfied",
+      "value": {"max_repair": 1, "max_escalation": 1, "terminal_unresolved_states": ["ASK_USER", "SAFE_STOP", "DEFERRED"]},
+      "required_for_activation": true,
+      "citations": [
+        {"source_file": "docs/product_sources/original/Architecture.md", "section": "2. Request lifecycle; 5. Routing and evaluation", "source_sha256": "f27714fbe3d21fefa1a43612b0c0c37c38a9ab23285f83a6b073408f677cfa1f"},
+        {"source_file": "docs/product_sources/original/Tier_Entitlements.md", "section": "Exhaustion and recovery", "source_sha256": "a5951649ce9070d96c14d9e5709116905da5381dafc894bcd96b95887d3c3f3a"}
+      ]
+    },
+    {
+      "id": "privacy.provenance_deletion_isolation",
+      "category": "privacy",
+      "requirement": "Route evidence and context retain source provenance, tenant scope, deletion semantics, retention restrictions, and safe data handling.",
+      "status": "satisfied",
+      "value": "tenant_scoped_provenance_and_deletion_required",
+      "required_for_activation": true,
+      "citations": [
+        {"source_file": "docs/product_sources/original/PRD.md", "section": "4. Requirements and acceptance (REQ-ID-001, REQ-CTX-001, REQ-CTX-002, REQ-PRIV-001)", "source_sha256": "779ff5233b642a1571fcf42b5d756a834039c66a7ca987f9e94acda87e38d054"},
+        {"source_file": "docs/product_sources/original/Architecture.md", "section": "4. Context algorithm; 9. Future channels and operations", "source_sha256": "f27714fbe3d21fefa1a43612b0c0c37c38a9ab23285f83a6b073408f677cfa1f"}
+      ]
+    },
+    {
+      "id": "activation.measured_provider_pool",
+      "category": "activation",
+      "requirement": "A small validated provider/model pool, representative end-to-end quality/cost measurements, budget stress evidence, and model/policy versions are required before staging eligibility.",
+      "status": "unavailable",
+      "value": "UNRESOLVED_OWNER_INPUT",
+      "required_for_activation": true,
+      "citations": [
+        {"source_file": "docs/product_sources/original/Tier_Entitlements.md", "section": "Activation gates", "source_sha256": "a5951649ce9070d96c14d9e5709116905da5381dafc894bcd96b95887d3c3f3a"},
+        {"source_file": "docs/product_sources/original/Model_Testing_Spec.md", "section": "Scoring and uncertainty; Automatic and manual acceptance", "source_sha256": "a516d42bb817f5d2fdcb6e1d481c3c11863e6659ae8d6c448dbdc3d3e157df35"}
+      ]
+    },
+    {
+      "id": "owner.pricing_quotas_provider_allowlist",
+      "category": "owner_input",
+      "requirement": "Plan prices, paid allowances/quotas, provider allowlists, and production spending ceilings must be explicitly approved from measured costs.",
+      "status": "blocking",
+      "value": "UNRESOLVED_OWNER_INPUT",
+      "required_for_activation": true,
+      "citations": [
+        {"source_file": "docs/product_sources/original/PRD.md", "section": "1. Product and customer; 7. Success measures and economics", "source_sha256": "779ff5233b642a1571fcf42b5d756a834039c66a7ca987f9e94acda87e38d054"},
+        {"source_file": "docs/product_sources/original/Tier_Entitlements.md", "section": "Document heading; Required versioned configuration", "source_sha256": "a5951649ce9070d96c14d9e5709116905da5381dafc894bcd96b95887d3c3f3a"}
+      ]
+    },
+    {
+      "id": "owner.launch_geography_channel_eligibility",
+      "category": "owner_input",
+      "requirement": "Launch geography and channel eligibility require a current documented decision; the provisional India WhatsApp scope is explicitly blocked pending that decision.",
+      "status": "blocking",
+      "value": "UNRESOLVED_OWNER_INPUT",
+      "required_for_activation": true,
+      "citations": [
+        {"source_file": "docs/product_sources/original/PRD.md", "section": "3. Launch dependency: channel eligibility", "source_sha256": "779ff5233b642a1571fcf42b5d756a834039c66a7ca987f9e94acda87e38d054"},
+        {"source_file": "docs/product_sources/original/Architecture.md", "section": "9. Future channels and operations", "source_sha256": "f27714fbe3d21fefa1a43612b0c0c37c38a9ab23285f83a6b073408f677cfa1f"}
+      ]
+    }
+  ]
+}

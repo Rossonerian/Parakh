@@ -66,6 +66,42 @@ Repeat the same fake run with the same suite hash, provider variant, configurati
 
 Live providers are optional and require an explicit approved run plan, bounded case/retry/output counts, timeout, concurrency, and conservative spend ceiling. Start with a small development subset and a dry-run/configuration check. Unknown pricing blocks paid scheduling unless an operator supplies a conservative bound labeled as such. Ollama is supported through `MODELLAB_OLLAMA_ENDPOINT`; OpenRouter is supported through `OPENROUTER_API_KEY` and the optional `MODELLAB_OPENROUTER_ENDPOINT`. Both adapters preserve provider-reported token metadata, never invent cost, and fail closed when configuration is absent. Never run paid calls from CI or the default offline commands.
 
+## Authorized development-only live pilot
+
+The committed operator template is intentionally invalid and contains no
+commercial authorization. Copy it to an access-controlled location outside the
+repository, then supply three to five supported `ollama:model[:revision]` or
+`openrouter:model[:revision]` candidates, a dated same-currency rate card with
+the declared units, positive per-model and total ceilings, an explicit
+operator identity/date/maximum-spend authorization, and the required
+development-only declarations.
+
+```bash
+.venv/bin/python -m model_lab pilot validate-input \
+  --input /secure/operator-input.yaml --suite benchmarks/seed_cases.jsonl
+.venv/bin/python -m model_lab pilot plan \
+  --operator-input /secure/operator-input.yaml \
+  --constraint-map docs/live_pilots/router-constraint-map-v0.2.0.json \
+  --out /secure/pilot-plan.json
+.venv/bin/python -m model_lab pilot show /secure/pilot-plan.json
+```
+
+The first plan is exactly 36 train cases. With three candidates and two
+repeats it has 216 base calls; the plan displays retry-inclusive maximum calls
+and conservative spend bounds. `pilot run --allow-paid` displays all frozen
+source, constraint, model, pricing, and case-set hashes plus exact cases,
+retries, judge/red-team options, and ceilings before it can call a provider.
+Do not run it without the owner's explicit authorization. The prepared first
+runner requires `concurrency: 1`, disables judge/red-team calls, and retains
+the full reservation when provider usage/cost is unknown.
+
+After an actual pilot, run only the prepared evidence gates: reconcile provider
+usage against local provider-expense reservations without replacing unknowns,
+grade with protected oracles, export calibration-only blind review material,
+record explicit calibration policy selection, consume holdout exactly once only
+after the policy/config hashes are frozen, and generate router shadow replay.
+These gates cannot edit the application router.
+
 ## Blind-review and grading CLI
 
 ```bash
