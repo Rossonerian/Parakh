@@ -10,6 +10,19 @@ Prepared 2026-09-09 for a WhatsApp-first assistant with four subscriptions and f
 4. Paste Start_Project_Prompt.md into the Boss thread to implement the bounded core release with tests and evidence.
 5. To build the Linux model comparison tool independently, paste Testing_Lab_Prompt.md into a Codex thread with Model_Testing_Spec.md and benchmarks/ available.
 
+## Current architecture
+
+The ModelLab package now follows a minimal layered structure to clarify ownership without changing the command surface:
+
+- `model_lab/cli/` exposes the user-facing CLI entry points and output helpers.
+- `model_lab/application/` owns orchestration of execution and reporting workflows.
+- `model_lab/domain/` owns the business contracts, validation rules, grading, budgets, and candidate isolation semantics.
+- `model_lab/storage/` owns the SQLite persistence and transactional budget logic.
+- `model_lab/providers/` owns the fake and live provider adapters.
+- `model_lab/*.py` files remain as compatibility shims to preserve the current import surface while the package layout becomes explicit.
+
+This keeps the existing behavior stable while making the flow obvious: CLI -> application orchestration -> domain rules -> storage/providers -> evidence/reporting.
+
 ## Files
 
 | File | Purpose |
