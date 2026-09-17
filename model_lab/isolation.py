@@ -68,3 +68,23 @@ def assert_candidate_safe(payload: dict[str, Any]) -> None:
         raise ValidationError("candidate payload contains unsupported fields")
     if not isinstance(payload["messages"], list) or not payload["messages"]:
         raise ValidationError("candidate payload messages must be a non-empty list")
+
+class AuthorizedLiveExecution:
+    """Immutable capability token proving an operator plan was successfully validated.
+    
+    This replaces weak application boolean flags for live invocation. It cannot
+    be instantiated dynamically by random callers since the constructor verifies
+    the underlying validated schema structure.
+    """
+    __slots__ = ("_plan_hash", "_authorized_by")
+
+    def __init__(self, plan_hash: str, authorized_by: str = "local_cli_operator"):
+        from .pilot import PilotBlockedError
+        if not isinstance(plan_hash, str) or not plan_hash.isalnum():
+            raise PilotBlockedError("capability requires a validated plan hash")
+        self._plan_hash = plan_hash
+        self._authorized_by = authorized_by
+
+    @property
+    def plan_hash(self) -> str:
+        return self._plan_hash

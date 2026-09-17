@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
+from .isolation import AuthorizedLiveExecution
 from pathlib import Path
 import re
 from typing import Any, Callable, Iterable, Mapping
@@ -198,14 +199,14 @@ def import_promptfoo_fixture(source: Mapping[str, Any] | str | Path, manifest: M
     return PromptfooImportResult(True, tuple(attempts), tuple(), source_hash)
 
 
-def invoke_promptfoo(manifest: Mapping[str, Any], *, approved_plan: bool = False, runner: Callable[[Mapping[str, Any]], Any] | None = None) -> Any:
+def invoke_promptfoo(manifest: Mapping[str, Any], *, capability: AuthorizedLiveExecution, runner: Callable[[Mapping[str, Any]], Any] | None = None) -> Any:
     """Invoke only through an explicitly approved, injected runner.
 
     This intentionally has no subprocess fallback: CI and offline operation must
     not be able to launch an unbudgeted live provider or Promptfoo command.
     """
     _manifest_cases(manifest)
-    if not approved_plan:
+    if not isinstance(capability, AuthorizedLiveExecution) or not capability._authorized_by:
         raise PromptfooImportError("live Promptfoo invocation requires an approved plan")
     if runner is None:
         raise PromptfooImportError("live Promptfoo invocation requires an approved runner")

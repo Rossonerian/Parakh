@@ -172,7 +172,10 @@ def test_promptfoo_import_rejects_duplicate_and_unknown_case_ids() -> None:
 def test_promptfoo_live_invocation_fails_closed() -> None:
     manifest = export_promptfoo_manifest(_candidate_cases(), run_id="run-1")
 
-    with pytest.raises(PromptfooImportError, match="approved"):
+    with pytest.raises(TypeError):
         invoke_promptfoo(manifest)
+
+    from model_lab.isolation import AuthorizedLiveExecution
+    cap = AuthorizedLiveExecution("validhash", "cli")
     with pytest.raises(PromptfooImportError, match="runner"):
-        invoke_promptfoo(manifest, approved_plan=True)
+        invoke_promptfoo(manifest, capability=cap)

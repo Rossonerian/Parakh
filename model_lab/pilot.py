@@ -202,7 +202,7 @@ def verify_immutable_plan(plan: Mapping[str, Any], *, source_manifest_path: str 
 
 def require_dispatch_authorization(plan: Mapping[str, Any], *, allow_paid: bool,
                                    source_manifest_path: str | Path | None = None,
-                                   constraint_map_path: str | Path | None = None) -> None:
+                                   constraint_map_path: str | Path | None = None) -> "AuthorizedLiveExecution":
     blockers = validate_pilot_plan(plan)
     if not allow_paid:
         blockers.append("explicit_allow_paid_acknowledgement_required")
@@ -212,6 +212,9 @@ def require_dispatch_authorization(plan: Mapping[str, Any], *, allow_paid: bool,
         if source_manifest_path is None or constraint_map_path is None:
             raise PilotBlockedError("immutable plan source and constraint paths are required")
         verify_immutable_plan(plan, source_manifest_path=source_manifest_path, constraint_map_path=constraint_map_path)
+
+    from .isolation import AuthorizedLiveExecution
+    return AuthorizedLiveExecution(plan.get("plan_hash") or "unknown")
 
 
 def dispatch_preview(plan: Mapping[str, Any]) -> dict[str, Any]:
@@ -270,7 +273,7 @@ def run_authorized_immutable_pilot(plan: Mapping[str, Any], *, suite_path: str |
     """
     if plan.get("immutable") is not True:
         raise PilotBlockedError("paid pilot execution requires an immutable operator plan")
-    require_dispatch_authorization(plan, allow_paid=True, source_manifest_path=source_manifest_path, constraint_map_path=constraint_map_path)
+    capability = require_dispatch_authorization(plan, allow_paid=True, source_manifest_path=source_manifest_path, constraint_map_path=constraint_map_path)
     execution = plan["execution"]
     if execution["concurrency"] != 1:
         raise PilotBlockedError("live pilot runner currently supports concurrency=1 only")
