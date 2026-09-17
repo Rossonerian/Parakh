@@ -200,11 +200,12 @@ class SQLiteStore:
                 raise
 
     def settle_budget(self, reservation_id: str, actual_cost_minor: int | None, state: str = "settled") -> None:
-        if state not in {"settled", "released", "unknown"}:
-            raise ValidationError("invalid budget settlement state")
-        updated = self.connection.execute("UPDATE budget_reservations SET actual_cost_minor = ?, state = ? WHERE reservation_id = ? AND state = 'reserved'", (actual_cost_minor, state, reservation_id)).rowcount
-        if updated != 1:
-            raise NotFoundError(f"unknown or already settled reservation: {reservation_id}")
+        with self._lock:
+            if state not in {"settled", "released", "unknown"}:
+                raise ValidationError("invalid budget settlement state")
+            updated = self.connection.execute("UPDATE budget_reservations SET actual_cost_minor = ?, state = ? WHERE reservation_id = ? AND state = 'reserved'", (actual_cost_minor, state, reservation_id)).rowcount
+            if updated != 1:
+                raise NotFoundError(f"unknown or already settled reservation: {reservation_id}")
 
     def close_without_delete(self) -> None:
         """Explicitly named hook for callers that must not destroy evidence."""
