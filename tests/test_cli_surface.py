@@ -32,3 +32,20 @@ def test_operational_cli_surface(tmp_path: Path):
     assert main(["promptfoo", "export", "--suite", str(ROOT / "benchmarks/seed_cases.jsonl"), "--out", str(manifest_path)]) == 0
     manifest = json.loads(manifest_path.read_text())
     assert manifest["artifact_type"] == "model_lab.promptfoo_manifest"
+
+
+def test_cli_subcommand_help_descriptions():
+    from model_lab.cli import build_parser
+
+    parser = build_parser()
+    subparsers = parser._subparsers._group_actions[0].choices
+
+    init_help = subparsers["init"].format_help()
+    assert "workspace directory path" in init_help
+
+    run_help = subparsers["run"].format_help()
+    assert "path to benchmark suite file" in run_help
+    assert "output directory for run artifacts" in run_help
+
+    demo_help = subparsers["demo"].format_help()
+    assert "random seed for demo evaluation" in demo_help
