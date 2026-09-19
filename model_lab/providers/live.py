@@ -11,6 +11,7 @@ import json
 import os
 from typing import Any, Mapping
 from urllib.error import HTTPError, URLError
+from urllib.parse import urlparse
 from urllib.request import Request, urlopen
 
 from .base import ProviderCapabilities, ProviderConfigurationError, ProviderRequest, ProviderResponse, ProviderRuntimeError
@@ -21,6 +22,9 @@ def _messages(request: ProviderRequest) -> list[dict[str, str]]:
 
 
 def _post_json(url: str, payload: Mapping[str, Any], headers: Mapping[str, str], timeout: float | None) -> dict[str, Any]:
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise ProviderRuntimeError(f"unsupported or invalid URL scheme '{parsed.scheme}': only http and https are allowed")
     body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     request = Request(url, data=body, headers={"Content-Type": "application/json", **headers}, method="POST")
     try:
