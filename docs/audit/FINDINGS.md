@@ -77,7 +77,7 @@ All findings use the standardized block format:
 - Impact: Importing external aggregate reports via CLI format flag fails.
 - Proposed fix: Add `aggregate-report` format parsing or clarify format support in documentation/CLI.
 - Fix risk: Low.
-- Status: OPEN
+- Status: FIXED (commit bc477ce)
 
 ### [C-03] Makefile test-release target omits integration test suite
 - Severity: S3
