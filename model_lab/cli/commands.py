@@ -76,7 +76,7 @@ def build_parser() -> argparse.ArgumentParser:
     imported.add_argument("path", help="path to file containing attempt records")
     imported.add_argument("--db", required=True, help="path to SQLite database file")
     imported.add_argument("--run", required=True, dest="run_id", help="target run ID in the database")
-    imported.add_argument("--format", choices=("jsonl", "json", "csv"), help="input file format (jsonl, json, or csv)")
+    imported.add_argument("--format", choices=("jsonl", "json", "csv", "aggregate-report"), help="input file format (jsonl, json, csv, or aggregate-report)")
     imported.add_argument("--source-label", default="cli-import", help="label for import source (default: cli-import)")
 
     for name in ("grade", "compare", "report", "audit"):

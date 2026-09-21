@@ -68,11 +68,14 @@ def ingest_file(store: SQLiteStore, run_id: str, path: str | Path, *, fmt: str |
         elif fmt == "json":
             value = json.loads(source.read_text(encoding="utf-8"))
             records = value if isinstance(value, list) else value.get("attempts", []) if isinstance(value, dict) else []
+        elif fmt in {"aggregate-report", "aggregate_report"}:
+            value = json.loads(source.read_text(encoding="utf-8"))
+            records = value.get("rows", []) if isinstance(value, dict) else []
         elif fmt == "csv":
             with source.open(newline="", encoding="utf-8") as stream:
                 records = list(csv.DictReader(stream))
         else:
-            raise ValidationError("format must be jsonl, json, or csv")
+            raise ValidationError("format must be jsonl, json, csv, or aggregate-report")
     except (OSError, UnicodeDecodeError, json.JSONDecodeError, csv.Error, AttributeError, TypeError) as exc:
         raise ValidationError(f"cannot parse import: {exc}") from exc
     if not isinstance(records, list):

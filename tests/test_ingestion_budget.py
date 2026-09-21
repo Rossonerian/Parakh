@@ -76,3 +76,18 @@ def test_csv_import(tmp_path):
     path = tmp_path / "answers.csv"
     path.write_text("attempt_id,case_id,prompt_hash,response_text,provider,model\nimport-csv,%s,%s,hello,fake,synthetic-v1\n" % (suite.case_ids[0], suite.cases[0].prompt_hash), encoding="utf-8")
     assert ingest_file(store, run.run_id, path, fmt="csv").imported == 1
+
+
+def test_aggregate_report_import(tmp_path):
+    store = SQLiteStore()
+    suite, run = setup_run(store)
+    path = tmp_path / "vendor_report.json"
+    report_data = {
+        "report_version": "model_lab.report/v1",
+        "rows": [record(suite, attempt_id="import-agg-1")]
+    }
+    path.write_text(json.dumps(report_data), encoding="utf-8")
+    result = ingest_file(store, run.run_id, path, fmt="aggregate-report")
+    assert result.imported == 1
+    assert store.get_attempt("import-agg-1").attempt_id == "import-agg-1"
+
