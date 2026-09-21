@@ -21,7 +21,7 @@ test-e2e:
 test-smoke:
 	$(PYTHON) -m model_lab suite validate benchmarks/seed_cases.jsonl
 
-test-release: doctor test-unit test-e2e
+test-release: doctor test-unit test-integration test-e2e test-smoke
 
 demo:
 	$(PYTHON) -m model_lab demo --suite benchmarks/seed_cases.jsonl --out lab-data/demo
