@@ -106,7 +106,7 @@ These gates cannot edit the application router.
 
 ```bash
 .venv/bin/python -m model_lab review export --db lab-data/demo/model_lab.sqlite3 --run run-synthetic-good --out /tmp/review.jsonl
-# Complete selected rows with decision/reviewer_pseudonym/score/confidence.
+# Complete selected rows with decision/reviewer_pseudonym/score/confidence (decision must be accept, reject, tie, or abstain).
 .venv/bin/python -m model_lab review import --db lab-data/demo/model_lab.sqlite3 --run run-synthetic-good --in /tmp/review-completed.jsonl
 .venv/bin/python -m model_lab grade --db lab-data/demo/model_lab.sqlite3 --suite benchmarks/seed_cases.jsonl --run run-synthetic-good
 ```

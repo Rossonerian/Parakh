@@ -39,11 +39,13 @@ def build_parser() -> argparse.ArgumentParser:
 
     suite = sub.add_parser("suite", help="validate, inspect, or export a benchmark suite")
     suite_sub = suite.add_subparsers(dest="suite_command", required=True)
-    for name in ("validate", "inspect"):
-        command = suite_sub.add_parser(name)
-        command.add_argument("path")
+    validate_cmd = suite_sub.add_parser("validate")
+    validate_cmd.add_argument("path", default="benchmarks/seed_cases.jsonl", nargs="?", help="path to benchmark suite file (default: benchmarks/seed_cases.jsonl)")
+    inspect_cmd = suite_sub.add_parser("inspect")
+    inspect_cmd.add_argument("path", default="benchmarks/seed_cases.jsonl", nargs="?", help="path to benchmark suite file (default: benchmarks/seed_cases.jsonl)")
+    inspect_cmd.add_argument("--group-by", help="comma-separated grouping fields (e.g. domain,complexity_level)")
     export = suite_sub.add_parser("export")
-    export.add_argument("path")
+    export.add_argument("path", default="benchmarks/seed_cases.jsonl", nargs="?", help="path to benchmark suite file (default: benchmarks/seed_cases.jsonl)")
     export.add_argument("--out", required=True)
     export.add_argument("--candidate-only", action="store_true", default=False)
 
