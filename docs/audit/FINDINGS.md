@@ -207,7 +207,7 @@ All findings use the standardized block format:
 - Impact: Pull requests and commits are not automatically validated against regression in CI.
 - Proposed fix: Create `.github/workflows/ci.yml` running `make test-release` and `make test-smoke`.
 - Fix risk: Low.
-- Status: OPEN
+- Status: FIXED (commit a399f07)
 
 ### [F-01] Memory.md state drift and open Supervisor gate
 - Severity: S3
