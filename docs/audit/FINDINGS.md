@@ -187,7 +187,7 @@ All findings use the standardized block format:
 - Impact: Specification gates for unsupported modality labeling and tool timeout simulator recovery are not covered by automated tests.
 - Proposed fix: Add unit tests covering modality validation/labeling and tool-timeout simulation.
 - Fix risk: Low.
-- Status: OPEN
+- Status: FIXED (commit a6dbbbf)
 
 ### [E-03] Reproducibility verification
 - Severity: S2
