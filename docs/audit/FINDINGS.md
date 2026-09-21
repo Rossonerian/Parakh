@@ -67,7 +67,7 @@ All findings use the standardized block format:
 - Impact: Stated command from the test specification cannot be invoked via the CLI.
 - Proposed fix: Implement `promptfoo run` subparser in `model_lab/cli/commands.py` wired to `model_lab.promptfoo.invoke_promptfoo`.
 - Fix risk: Low.
-- Status: OPEN
+- Status: FIXED (commit 2109dfc)
 
 ### [C-02] Missing CLI format: model-lab import --format aggregate-report
 - Severity: S3
