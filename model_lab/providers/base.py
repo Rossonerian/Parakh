@@ -26,6 +26,11 @@ class ProviderCapabilities:
     supports_tools: bool = False
     context_window: int | None = None
     pricing_known: bool = False
+    supported_modalities: tuple[str, ...] = ("text",)
+
+    def supports_modality(self, modality: str) -> bool:
+        return modality.lower() in {m.lower() for m in self.supported_modalities}
+
 
 
 @dataclass(frozen=True)

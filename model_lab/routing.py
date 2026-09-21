@@ -34,3 +34,25 @@ def draft_recommendations(comparison: ComparisonResult, *, cases: Iterable[Case]
                        "limitations": limitations, "synthetic": synthetic, "draft_only": True})
     return output
 
+
+def check_candidate_eligibility(
+    capabilities: Any,
+    *,
+    required_modalities: tuple[str, ...] = ("text",),
+    required_context: int | None = None,
+) -> tuple[bool, list[str]]:
+    """Check whether a model candidate meets task condition requirements."""
+    reasons: list[str] = []
+    for mod in required_modalities:
+        if hasattr(capabilities, "supports_modality"):
+            if not capabilities.supports_modality(mod):
+                reasons.append(f"unsupported_modality:{mod}")
+        elif hasattr(capabilities, "supported_modalities"):
+            if mod.lower() not in {m.lower() for m in capabilities.supported_modalities}:
+                reasons.append(f"unsupported_modality:{mod}")
+        elif mod != "text":
+            reasons.append(f"unsupported_modality:{mod}")
+    if required_context and getattr(capabilities, "context_window", None):
+        if capabilities.context_window < required_context:
+            reasons.append(f"insufficient_context_window:{capabilities.context_window}<{required_context}")
+    return (len(reasons) == 0, reasons)

@@ -45,3 +45,18 @@ def test_router_draft_is_evidence_bound_and_marks_synthetic_limitations():
     assert recommendations[0]["evidence_ids"]
     assert recommendations[0]["limitations"]
     assert recommendations[0]["synthetic"] is True
+
+
+def test_unsupported_modality_labeling():
+    from model_lab.providers.base import ProviderCapabilities
+    from model_lab.routing import check_candidate_eligibility
+
+    caps = ProviderCapabilities("fake", "text-model", supported_modalities=("text",))
+    eligible, reasons = check_candidate_eligibility(caps, required_modalities=("text", "audio"))
+    assert eligible is False
+    assert "unsupported_modality:audio" in reasons
+
+    text_eligible, no_reasons = check_candidate_eligibility(caps, required_modalities=("text",))
+    assert text_eligible is True
+    assert no_reasons == []
+

@@ -88,3 +88,29 @@ def test_retry_with_unknown_failed_attempt_cost_keeps_conservative_reservation()
     assert result.status == "completed"
     row = store.connection.execute("SELECT state, actual_cost_minor, reserved_cost_minor FROM budget_reservations").fetchone()
     assert tuple(row) == ("unknown", None, 8)
+
+
+def test_tool_simulator_timeout_recovery():
+    class ToolSimulatorProvider:
+        name = "simulator"
+        capabilities = ProviderCapabilities("simulator", "tool-model", supports_tools=True)
+
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def generate(self, request: ProviderRequest) -> ProviderResponse:
+            self.calls += 1
+            if self.calls == 1:
+                raise ProviderRuntimeError("tool execution simulator timeout after 5000ms")
+            return ProviderResponse(text='{"tool_result": "success"}', cost_minor=5, currency="USD")
+
+    suite = load_suite(ROOT / "benchmarks/seed_cases.jsonl")
+    store = SQLiteStore()
+    run = make_run(suite, run_id="run-tool-timeout", budget=Budget(max_requests=1, max_cost_minor=20, currency="USD"))
+    result = ExecutionEngine(store, ToolSimulatorProvider(), max_retries=1, estimated_cost_minor_per_logical_request=10).execute(suite, run, case_ids=[suite.case_ids[0]])
+    assert result.status == "completed"
+    assert len(result.attempts) == 2
+    assert result.attempts[0].status.value == "provider_failure"
+    assert "tool execution simulator timeout" in (result.attempts[0].error or "")
+    assert result.attempts[1].status.value == "success"
+
