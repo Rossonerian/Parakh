@@ -237,7 +237,7 @@ All findings use the standardized block format:
 - Impact: Cluttered directory with potential confusion over active vs historical pilot artifacts.
 - Proposed fix: Move superseded files into `docs/live_pilots/superseded/` or add deprecation banners.
 - Fix risk: Low.
-- Status: OPEN
+- Status: FIXED (commit 0fe65ea)
 
 ### [F-04] Documentation discrepancies with CLI commands and options
 - Severity: S3
