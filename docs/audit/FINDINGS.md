@@ -87,7 +87,7 @@ All findings use the standardized block format:
 - Impact: Release target does not verify the integration target as required by the acceptance contract.
 - Proposed fix: Update `Makefile` to include `test-integration` and `test-smoke` in `test-release`.
 - Fix risk: None; all test suites currently pass.
-- Status: OPEN
+- Status: FIXED (commit d571617)
 
 ### [C-04] Dependency declaration vs specification divergence
 - Severity: S3
