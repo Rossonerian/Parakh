@@ -105,6 +105,9 @@ def build_parser() -> argparse.ArgumentParser:
     promptfoo_import.add_argument("--manifest", required=True)
     promptfoo_import.add_argument("--artifact", required=True)
     promptfoo_import.add_argument("--quarantine-dir")
+    promptfoo_run = promptfoo_sub.add_parser("run")
+    promptfoo_run.add_argument("--manifest", required=True)
+    promptfoo_run.add_argument("--allow-paid", action="store_true", help="require explicit operator acknowledgement for paid dispatch")
 
     pilot = sub.add_parser("pilot", help="prepare and inspect a controlled development-only live pilot")
     pilot_sub = pilot.add_subparsers(dest="pilot_command", required=True)
@@ -263,6 +266,10 @@ def main(argv: list[str] | None = None) -> int:
                 manifest = export_promptfoo_manifest([case.candidate_payload() for case in suite.cases], run_id=args.run_id)
                 _write_json(args.out, manifest)
                 _print_json({"exported": len(suite.cases), "path": args.out, "candidate_only": True, "manifest_hash": manifest["manifest_hash"]})
+            elif args.promptfoo_command == "run":
+                if not getattr(args, "allow_paid", False):
+                    raise ModelLabError("live Promptfoo invocation blocked: explicit --allow-paid acknowledgement required")
+                raise ModelLabError("live Promptfoo invocation blocked: approved live runner required")
             else:
                 manifest = json.loads(Path(args.manifest).read_text(encoding="utf-8"))
                 result = import_promptfoo_fixture(args.artifact, manifest, quarantine_dir=args.quarantine_dir)

@@ -49,3 +49,13 @@ def test_cli_subcommand_help_descriptions():
 
     demo_help = subparsers["demo"].format_help()
     assert "random seed for demo evaluation" in demo_help
+
+
+def test_promptfoo_run_cli_surface(tmp_path: Path):
+    manifest_path = tmp_path / "manifest.json"
+    assert main(["promptfoo", "export", "--suite", str(ROOT / "benchmarks/seed_cases.jsonl"), "--out", str(manifest_path)]) == 0
+    # promptfoo run without --allow-paid must be rejected with exit code 2
+    assert main(["promptfoo", "run", "--manifest", str(manifest_path)]) == 2
+    # promptfoo run with --allow-paid but without approved runner must also be rejected
+    assert main(["promptfoo", "run", "--manifest", str(manifest_path), "--allow-paid"]) == 2
+
