@@ -47,7 +47,7 @@ All findings use the standardized block format:
 - Impact: Code duplication creates a high risk of divergence where bugfixes applied to one file are not reflected in the duplicate file.
 - Proposed fix: Convert `model_lab/{budget,execution,isolation,reporting}.py` to pure re-export compatibility shims importing from their canonical layered modules.
 - Fix risk: Low, provided all public symbols and `__all__` remain exported.
-- Status: OPEN
+- Status: FIXED (commit 849fc64)
 
 ### [B-04] Directory case collision: .jules and .Jules tracked in git
 - Severity: S4
