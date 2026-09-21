@@ -215,9 +215,9 @@ All findings use the standardized block format:
 - Evidence: `Memory.md` line 4 records integrated tree `3004c37491b90af8b88807d321b06b829cdde76a`, but body describes later commits `4004808` and `20ebc9b`, while current git HEAD is `7779ff1`. Test count claims in `Memory.md` ("57 tests passed", "60 tests passed") differ from current 73 tests. Line 76 notes that the final Supervisor review on `20ebc9b` was blocked by runtime limits and left unobtained.
 - Reproduction: Inspect `Memory.md` lines 4, 62-83 and run `git rev-parse HEAD`.
 - Impact: Project memory is outdated relative to git history and current test counts, and records an open review gate.
-- Proposed fix: Update `Memory.md` (by Boss/owner role) to reflect current HEAD, 73 passing tests, and updated audit status.
+- Proposed fix: Update `Memory.md` (by Boss/owner role) to reflect current HEAD, 77 passing tests, and updated audit status.
 - Fix risk: Low; documentation only.
-- Status: OPEN
+- Status: NEEDS-OWNER-ACTION (Memory.md is protected by Rule #6; proposed diff provided in AUDIT_REPORT.md)
 
 ### [F-02] Root README.md drift from byte-preserved imported copy
 - Severity: S3
@@ -227,7 +227,7 @@ All findings use the standardized block format:
 - Impact: Manifest records root files as identical to byte-preserved imported originals, but root `README.md` has drifted.
 - Proposed fix: Update `docs/product_sources/SOURCE_MANIFEST.json` and `IMPORT_AUDIT.jsonl` to record the architecture documentation update to root `README.md`.
 - Fix risk: Low.
-- Status: OPEN
+- Status: NEEDS-OWNER-ACTION (IMPORT_AUDIT.jsonl is protected by Rule #6; proposed update provided in AUDIT_REPORT.md)
 
 ### [F-03] Superseded artifacts in live pilots directory
 - Severity: S4
