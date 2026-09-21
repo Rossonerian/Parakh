@@ -27,7 +27,7 @@ All findings use the standardized block format:
 - Impact: `model_lab/cli.py` is completely unreachable dead code that can drift from `model_lab/cli/commands.py`.
 - Proposed fix: Remove unreachable `model_lab/cli.py` since `model_lab/cli/` is the canonical package.
 - Fix risk: Low; any file importing `model_lab.cli` already resolves the package.
-- Status: OPEN
+- Status: FIXED (commit 90e24ec)
 
 ### [B-02] Module shadowing: model_lab/storage.py shadowed by package model_lab/storage/
 - Severity: S1
@@ -37,7 +37,7 @@ All findings use the standardized block format:
 - Impact: `model_lab/storage.py` is completely unreachable dead code that can drift from `model_lab/storage/sqlite.py`.
 - Proposed fix: Remove unreachable `model_lab/storage.py` since `model_lab/storage/` is the canonical package.
 - Fix risk: Low; any file importing `model_lab.storage` already resolves the package.
-- Status: OPEN
+- Status: FIXED (commit a29bafa)
 
 ### [B-03] Shim vs implementation duplicate logic in root model_lab/*.py
 - Severity: S2
