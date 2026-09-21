@@ -250,4 +250,4 @@ All findings use the standardized block format:
 - Impact: Users following documented spec examples encounter CLI argument errors.
 - Proposed fix: Harmonize documentation with CLI options or extend CLI options to match the spec.
 - Fix risk: Low.
-- Status: OPEN
+- Status: FIXED (commit 9f4ac6c)
