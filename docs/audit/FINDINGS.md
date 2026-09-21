@@ -57,7 +57,7 @@ All findings use the standardized block format:
 - Impact: On case-insensitive filesystems (macOS, Windows), checking out the repository causes directory collision and potential checkout corruption or file loss.
 - Proposed fix: Consolidate `.Jules/palette.md` into `.jules/` and remove `.Jules/`.
 - Fix risk: Low.
-- Status: OPEN
+- Status: FIXED (commit b55a4bf)
 
 ### [C-01] Missing CLI subcommand: model-lab promptfoo run
 - Severity: S3
