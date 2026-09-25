@@ -69,19 +69,31 @@ def _json_load(value: Any) -> tuple[Any | None, str | None]:
     if not isinstance(value, str):
         return value, None
     try:
-        return json.loads(value), None
+        # NaN/Infinity are accepted by Python's decoder by default, but are
+        # not JSON values and make a supposedly exact grade non-reproducible.
+        return json.loads(value, parse_constant=lambda token: (_ for _ in ()).throw(ValueError(f"invalid JSON constant: {token}"))), None
     except (TypeError, ValueError) as exc:
         return None, str(exc)
 
 
 def _json_equal(left: Any, right: Any, tolerance: float = 0.0) -> bool:
-    if isinstance(left, (int, float)) and isinstance(right, (int, float)) and not isinstance(left, bool) and not isinstance(right, bool):
-        return math.isclose(float(left), float(right), rel_tol=tolerance, abs_tol=tolerance)
+    # Never let bool compare equal to 0/1, and never cast integers to float:
+    # that loses equality information for integers above 2**53.
+    if isinstance(left, bool) or isinstance(right, bool):
+        return type(left) is type(right) and left == right
+    if isinstance(left, (int, float)) and isinstance(right, (int, float)):
+        if type(left) is not type(right):
+            return False
+        if isinstance(left, float) and (not math.isfinite(left) or not math.isfinite(right)):
+            return False
+        if tolerance:
+            return abs(left - right) <= tolerance
+        return left == right
     if isinstance(left, Mapping) and isinstance(right, Mapping):
         return set(left) == set(right) and all(_json_equal(left[key], right[key], tolerance) for key in left)
-    if isinstance(left, list) and isinstance(right, list):
+    if isinstance(left, (list, tuple)) and isinstance(right, (list, tuple)):
         return len(left) == len(right) and all(_json_equal(a, b, tolerance) for a, b in zip(left, right))
-    return left == right
+    return type(left) is type(right) and left == right
 
 
 def grade_exact_json(candidate: Any, reference: Any, *, attempt_id: str, numeric_tolerance: float = 0.0) -> Grade:
@@ -174,12 +186,12 @@ def grade_required_fields(candidate: Any, required_fields: Iterable[str], *, att
 def grade_attempt(case: Case, attempt: Attempt) -> Grade:
     """Apply only a deterministic case method; rubric cases abstain."""
     model = {"provider": attempt.model_config.provider, "model": attempt.model_config.model, "revision": attempt.model_config.revision}
-    if attempt.status is not AttemptStatus.SUCCESS:
-        return _abstain("attempt_status", attempt.attempt_id, f"attempt status is {attempt.status.value}", status=attempt.status.value, model=model)
-    if attempt.response_text is None:
-        return _abstain("missing_output", attempt.attempt_id, "successful attempt has no response text", model=model)
     method = case.evaluation.method
-    if method == "exact_json":
+    if attempt.status is not AttemptStatus.SUCCESS:
+        grade = _abstain("attempt_status", attempt.attempt_id, f"attempt status is {attempt.status.value}", status=attempt.status.value, model=model)
+    elif attempt.response_text is None:
+        grade = _abstain("missing_output", attempt.attempt_id, "successful attempt has no response text", model=model)
+    elif method == "exact_json":
         grade = grade_exact_json(attempt.response_text, case.evaluation.reference_answer, attempt_id=attempt.attempt_id)
     elif method == "exact_text":
         grade = grade_exact_text(attempt.response_text, _text(case.evaluation.reference_answer), attempt_id=attempt.attempt_id)

@@ -23,19 +23,24 @@ class ComparisonResult:
     family_counts: dict[str, int]
     independence_unit: str = "family_id"
     limitations: tuple[str, ...] = ()
+    duplicate_case_ids: tuple[str, ...] = ()
+    scored_pairs: int = 0
 
     def to_dict(self) -> dict[str, Any]:
-        return {"left_label": self.left_label, "right_label": self.right_label, "matched_cases": self.matched_cases,
+        result = {"left_label": self.left_label, "right_label": self.right_label, "matched_cases": self.matched_cases,
                 "observed_difference": self.observed_difference, "left_mean": self.left_mean, "right_mean": self.right_mean,
                 "by_domain": self.by_domain, "by_workflow": self.by_workflow, "by_complexity": self.by_complexity,
                 "by_split": self.by_split, "family_counts": self.family_counts, "independence_unit": self.independence_unit,
                 "limitations": list(self.limitations)}
+        result["duplicate_case_ids"] = list(self.duplicate_case_ids)
+        result["scored_pairs"] = self.scored_pairs
+        return result
 
 
 def _model_label(grades: Iterable[Grade], fallback: str) -> str:
     for grade in grades:
         model = grade.evidence.get("model", {})
-        if isinstance(model, dict) and model.get("model"):
+        if isinstance(model, Mapping) and model.get("model"):
             return str(model["model"])
     return fallback
 
@@ -43,8 +48,18 @@ def _model_label(grades: Iterable[Grade], fallback: str) -> str:
 def compare_grades(left: Iterable[Grade], right: Iterable[Grade], *, cases: Iterable[Case], left_label: str | None = None, right_label: str | None = None) -> ComparisonResult:
     left = list(left)
     right = list(right)
-    left_by = {grade.evidence.get("case_id"): grade for grade in left}
-    right_by = {grade.evidence.get("case_id"): grade for grade in right}
+    def index(grades: list[Grade]) -> tuple[dict[Any, Grade], set[Any]]:
+        grouped: dict[Any, list[Grade]] = {}
+        for grade in grades:
+            grouped.setdefault(grade.evidence.get("case_id"), []).append(grade)
+        duplicates = {case_id for case_id, values in grouped.items() if case_id is not None and len(values) > 1}
+        # An ambiguous repeat is not silently reduced to whichever record was
+        # last. It remains visible as a limitation and is excluded from pairs.
+        return ({case_id: values[0] for case_id, values in grouped.items() if case_id not in duplicates}, duplicates)
+
+    left_by, left_duplicates = index(left)
+    right_by, right_duplicates = index(right)
+    duplicate_case_ids = tuple(sorted(left_duplicates | right_duplicates))
     left_label = left_label or _model_label(left, "left")
     right_label = right_label or _model_label(right, "right")
     case_by = {case.case_id: case for case in cases}
@@ -88,6 +103,9 @@ def compare_grades(left: Iterable[Grade], right: Iterable[Grade], *, cases: Iter
         return out
 
     limitations = ["Scores are paired by case and repeated family variants are not independent.", "No statistical significance is inferred by this descriptive comparison."]
+    if duplicate_case_ids:
+        limitations.append("Duplicate case observations were excluded from paired scores; repeats require explicit aggregation.")
+    scored_pairs = sum(1 for _, left_score, right_score in rows if left_score is not None and right_score is not None)
     return ComparisonResult(
         left_label, right_label, len(rows),
         (sum(left_scores) / len(left_scores) - sum(right_scores) / len(right_scores)) if left_scores and right_scores else None,
@@ -99,6 +117,8 @@ def compare_grades(left: Iterable[Grade], right: Iterable[Grade], *, cases: Iter
         build_paired(split_map),
         family_counts,
         limitations=tuple(limitations),
+        duplicate_case_ids=duplicate_case_ids,
+        scored_pairs=scored_pairs,
     )
 
 
