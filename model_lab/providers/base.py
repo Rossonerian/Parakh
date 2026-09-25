@@ -15,7 +15,16 @@ class ProviderConfigurationError(ProviderError):
 
 
 class ProviderRuntimeError(ProviderError):
-    """Provider failed during a request."""
+    """Provider failed during a request.
+
+    ``retryable`` is deliberately conservative at call sites: transport and
+    service-availability failures may be retried, while malformed responses
+    and rejected configuration must not be replayed blindly.
+    """
+
+    def __init__(self, message: str, *, retryable: bool = True) -> None:
+        super().__init__(message)
+        self.retryable = retryable
 
 
 @dataclass(frozen=True)

@@ -8,34 +8,108 @@ and preserve provider-reported usage without inventing pricing.
 from __future__ import annotations
 
 import json
+import math
 import os
 from typing import Any, Mapping
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
-from urllib.request import Request, urlopen
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 
 from .base import ProviderCapabilities, ProviderConfigurationError, ProviderRequest, ProviderResponse, ProviderRuntimeError
+
+
+DEFAULT_TIMEOUT_SECONDS = 60.0
+MAX_TIMEOUT_SECONDS = 120.0
+MAX_RESPONSE_BYTES = 8 * 1024 * 1024
+_PROTECTED_PARAMETERS = frozenset({"model", "messages", "stream", "prompt"})
+
+
+class _RejectRedirects(HTTPRedirectHandler):
+    def redirect_request(self, req: Request, fp: Any, code: int, msg: str, headers: Any, newurl: str) -> None:
+        raise ProviderRuntimeError("provider redirect rejected; endpoint must be final", retryable=False)
 
 
 def _messages(request: ProviderRequest) -> list[dict[str, str]]:
     return [dict(message) for message in request.candidate.messages]
 
 
-def _post_json(url: str, payload: Mapping[str, Any], headers: Mapping[str, str], timeout: float | None) -> dict[str, Any]:
+def _timeout(value: float | None) -> float:
+    if value is None:
+        return DEFAULT_TIMEOUT_SECONDS
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value <= 0:
+        raise ProviderConfigurationError("provider timeout must be a finite positive number")
+    if value > MAX_TIMEOUT_SECONDS:
+        raise ProviderConfigurationError(f"provider timeout exceeds maximum of {MAX_TIMEOUT_SECONDS:g} seconds")
+    return float(value)
+
+
+def _validate_endpoint(url: str, *, provider: str) -> str:
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https"):
-        raise ProviderRuntimeError(f"unsupported or invalid URL scheme '{parsed.scheme}': only http and https are allowed")
+        raise ProviderRuntimeError(f"unsupported or invalid URL scheme '{parsed.scheme}': only http and https are allowed", retryable=False)
+    if not parsed.hostname:
+        raise ProviderConfigurationError("unsupported or invalid provider endpoint")
+    if parsed.username or parsed.password:
+        raise ProviderConfigurationError("provider endpoint must not contain embedded credentials")
+    if parsed.fragment or parsed.query:
+        raise ProviderConfigurationError("provider endpoint must not contain a query or fragment")
+    # Only explicitly configured local Ollama may use cleartext HTTP. Remote
+    # OpenRouter traffic must be encrypted so the bearer key cannot leak.
+    if provider == "openrouter" and parsed.scheme != "https" and parsed.hostname not in {"localhost", "127.0.0.1", "::1"}:
+        raise ProviderConfigurationError("openrouter endpoint must use https")
+    return url.rstrip("/")
+
+
+def _safe_parameters(parameters: Mapping[str, Any]) -> dict[str, Any]:
+    forbidden = _PROTECTED_PARAMETERS.intersection(parameters)
+    if forbidden:
+        raise ProviderConfigurationError(f"provider parameters cannot override protected fields: {', '.join(sorted(forbidden))}")
+    return dict(parameters)
+
+
+def _model_matches(request_model: str, provider: str, configured_model: str) -> bool:
+    # ModelLab candidate identifiers commonly use provider:model while the
+    # adapter receives the provider-native model id.
+    return request_model in {configured_model, f"{provider}/{configured_model}"}
+
+
+def _nonnegative_int(value: Any, field: str) -> int | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise ProviderRuntimeError(f"provider returned invalid numeric field: {field}", retryable=False)
+    return value
+
+
+def _reported_cost(value: Any) -> int | float | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+        raise ProviderRuntimeError("provider returned invalid numeric field: cost", retryable=False)
+    return value
+
+
+def _post_json(url: str, payload: Mapping[str, Any], headers: Mapping[str, str], timeout: float | None) -> dict[str, Any]:
+    _validate_endpoint(url, provider="openrouter" if "Authorization" in headers else "ollama")
+    bounded_timeout = _timeout(timeout)
     body = json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
     request = Request(url, data=body, headers={"Content-Type": "application/json", **headers}, method="POST")
     try:
-        with urlopen(request, timeout=timeout or 60.0) as response:  # nosec B310 - endpoint is explicit operator configuration
-            value = json.loads(response.read().decode("utf-8"))
+        opener = build_opener(_RejectRedirects)
+        with opener.open(request, timeout=bounded_timeout) as response:  # nosec B310 - endpoint is validated operator configuration
+            raw = response.read(MAX_RESPONSE_BYTES + 1)
+            if len(raw) > MAX_RESPONSE_BYTES:
+                raise ProviderRuntimeError("provider response exceeds maximum size", retryable=False)
+            value = json.loads(raw.decode("utf-8"))
     except HTTPError as exc:
-        raise ProviderRuntimeError(f"provider HTTP error {exc.code}") from exc
+        retryable = exc.code == 429 or 500 <= exc.code <= 599
+        raise ProviderRuntimeError(f"provider HTTP error {exc.code}", retryable=retryable) from exc
+    except ProviderRuntimeError:
+        raise
     except (URLError, TimeoutError, OSError, json.JSONDecodeError) as exc:
         raise ProviderRuntimeError(f"provider request failed: {exc.__class__.__name__}") from exc
     if not isinstance(value, dict):
-        raise ProviderRuntimeError("provider returned a non-object JSON response")
+        raise ProviderRuntimeError("provider returned a non-object JSON response", retryable=False)
     return value
 
 
@@ -45,23 +119,29 @@ class OllamaProvider:
     def __init__(self, model: str, *, env: dict[str, str] | None = None) -> None:
         self.model = model
         self._env = os.environ if env is None else env
-        self.endpoint = self._env.get("MODELLAB_OLLAMA_ENDPOINT", "").rstrip("/")
+        configured = self._env.get("MODELLAB_OLLAMA_ENDPOINT", "")
+        self.endpoint = configured.rstrip("/")
         self.capabilities = ProviderCapabilities(self.name, model, supports_streaming=False, supports_tools=False, context_window=None, pricing_known=False)
 
     def generate(self, request: ProviderRequest) -> ProviderResponse:
         if not self.endpoint:
             raise ProviderConfigurationError("ollama disabled: missing MODELLAB_OLLAMA_ENDPOINT")
+        _validate_endpoint(self.endpoint, provider=self.name)
         payload: dict[str, Any] = {"model": self.model, "messages": _messages(request), "stream": False}
-        if request.parameters:
-            payload["options"] = dict(request.parameters)
+        if not _model_matches(request.model, self.name, self.model):
+            raise ProviderConfigurationError("request model does not match configured Ollama model")
+        parameters = _safe_parameters(request.parameters)
+        if parameters:
+            payload["options"] = parameters
         response = _post_json(f"{self.endpoint}/api/chat", payload, {}, request.timeout_seconds)
         message = response.get("message")
         if not isinstance(message, dict) or not isinstance(message.get("content"), str):
             raise ProviderRuntimeError("ollama response is missing message.content")
         return ProviderResponse(
             text=message["content"], finish_reason=response.get("done_reason"),
-            input_tokens=response.get("prompt_eval_count"), output_tokens=response.get("eval_count"),
-            metadata={"provider_reported": True, "done": response.get("done")},
+            input_tokens=_nonnegative_int(response.get("prompt_eval_count"), "prompt_eval_count"),
+            output_tokens=_nonnegative_int(response.get("eval_count"), "eval_count"),
+            metadata={"provider": self.name, "model": self.model, "request_model": request.model, "provider_reported": True, "done": response.get("done")},
         )
 
 
@@ -71,15 +151,19 @@ class OpenRouterProvider:
     def __init__(self, model: str, *, env: dict[str, str] | None = None) -> None:
         self.model = model
         self._env = os.environ if env is None else env
-        self.endpoint = self._env.get("MODELLAB_OPENROUTER_ENDPOINT", "https://openrouter.ai/api/v1/chat/completions")
+        configured = self._env.get("MODELLAB_OPENROUTER_ENDPOINT", "https://openrouter.ai/api/v1/chat/completions")
+        self.endpoint = configured.rstrip("/")
         self.capabilities = ProviderCapabilities(self.name, model, supports_streaming=False, supports_tools=False, context_window=None, pricing_known=False)
 
     def generate(self, request: ProviderRequest) -> ProviderResponse:
         key = self._env.get("OPENROUTER_API_KEY")
         if not key:
             raise ProviderConfigurationError("openrouter disabled: missing OPENROUTER_API_KEY")
+        _validate_endpoint(self.endpoint, provider=self.name)
+        if not _model_matches(request.model, self.name, self.model):
+            raise ProviderConfigurationError("request model does not match configured OpenRouter model")
         payload: dict[str, Any] = {"model": self.model, "messages": _messages(request)}
-        payload.update(request.parameters)
+        payload.update(_safe_parameters(request.parameters))
         if request.seed is not None:
             payload.setdefault("seed", request.seed)
         headers = {"Authorization": f"Bearer {key}"}
@@ -95,9 +179,13 @@ class OpenRouterProvider:
         message = choice.get("message")
         if not isinstance(message, dict) or not isinstance(message.get("content"), str):
             raise ProviderRuntimeError("openrouter response is missing choices[0].message.content")
-        usage = response.get("usage") if isinstance(response.get("usage"), dict) else {}
+        raw_usage = response.get("usage")
+        if raw_usage is not None and not isinstance(raw_usage, dict):
+            raise ProviderRuntimeError("openrouter response usage must be an object", retryable=False)
+        usage = raw_usage or {}
         return ProviderResponse(
             text=message["content"], finish_reason=choice.get("finish_reason"),
-            input_tokens=usage.get("prompt_tokens"), output_tokens=usage.get("completion_tokens"),
-            metadata={"provider_reported": True, "provider_usage": usage.get("cost") if "cost" in usage else None},
+            input_tokens=_nonnegative_int(usage.get("prompt_tokens"), "prompt_tokens"),
+            output_tokens=_nonnegative_int(usage.get("completion_tokens"), "completion_tokens"),
+            metadata={"provider": self.name, "model": self.model, "request_model": request.model, "provider_reported": True, "provider_usage": _reported_cost(usage.get("cost"))},
         )
