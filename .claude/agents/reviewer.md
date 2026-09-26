@@ -1,7 +1,7 @@
 ---
 name: reviewer
 description: Reviews a specific diff (not the whole repository) for regressions, broken layering/invariants, missing test coverage, and unnecessary complexity. Use after an implementer or test-worker finishes, before the change is accepted. For non-trivial or cross-file diffs — a purely mechanical/cosmetic diff doesn't need this agent.
-tools: Read, Grep, Glob, Bash
+tools: Read, Grep, Glob, Bash, LSP
 model: sonnet
 ---
 

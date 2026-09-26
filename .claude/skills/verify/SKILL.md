@@ -9,7 +9,7 @@ command you didn't run.
 1. `.venv/bin/python -m pytest -q` — full unit suite. System `python3` does
    not have pytest installed; using it will fail with `No module named
    pytest`, which is an environment mismatch, not proof of a real failure.
-2. `make PYTHON=.venv/bin/python test-release` — runs `doctor`,
+2. `make PYTHON=.venv/bin/python test-release` — runs `lint` (ruff), `doctor`,
    `test-unit`, `test-integration`, `test-e2e`, `test-smoke` in sequence
    (see `Makefile`). This is the same gate CI runs (`.github/workflows/ci.yml`),
    modulo the interpreter path.

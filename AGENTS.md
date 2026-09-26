@@ -2,7 +2,7 @@
 
 Read PRD.md, Architecture.md, Rules.md, Phases.md, Design.md, Tier_Entitlements.md and Agent_Team.md. Merge these instructions with any existing repository instructions; preserve user work and protected configuration.
 
-The Boss/Supervisor/worker model allocation in this project's `Agent_Team.md` is scoped to its separate Codex/Zed ACP workflow. It does not override the global OMP/Orca policy. For OMP/Orca work, use `~/.omp/agent/AGENTS.md` and `RULES.md`: Opus 5.5 planner, Sonnet 5 supervisor, Gemini High managed workers through `agent-team-orca-start`. Never request Sol/Terra/Luna from OMP unless that exact route is actually available. Verify effective capabilities/model IDs; do not pretend an unavailable model or agent was used. No recursive worker spawning.
+The Boss/Supervisor/worker model allocation in this project's `Agent_Team.md` is scoped to its separate Codex/Zed ACP workflow. It does not override the global OMP/Orca policy. For OMP/Orca work, use `~/.omp/agent/AGENTS.md` and `RULES.md`: Opus 5.5 planner, Gemini High managed workers through `agent-team-orca-start`. For this project the user explicitly assigned the supervisor role to Opus 5.5 (2026-09-26), overriding the global Sonnet 5 default. Never request Sol/Terra/Luna from OMP unless that exact route is actually available. Verify effective capabilities/model IDs; do not pretend an unavailable model or agent was used. No recursive worker spawning.
 
 Boss owns architectural decisions, integration, acceptance/rejection and root Memory.md. Supervisor independently recommends accept/rework/block based on the exact candidate; workers cannot approve their own code. Boss never waives failed security, isolation, financial correctness or data-integrity gates by assertion.
 

@@ -4,7 +4,7 @@ Updated 2026-09-10. This configures development agents, independently of the fou
 
 ## Runtime scope
 
-The model table and Boss/Supervisor/worker names in this document apply only to the separate Codex/Zed ACP workflow described below. They do not configure OMP, Orca, or Antigravity. For OMP/Orca execution, the user-level `~/.omp/agent/AGENTS.md` and `RULES.md` take precedence: Opus 5.5 planner, Sonnet 5 supervisor, and gated Gemini High workers. Do not treat a Codex/Zed model ID as available in OMP unless its provider route is independently confirmed.
+The model table and Boss/Supervisor/worker names in this document apply only to the separate Codex/Zed ACP workflow described below. They do not configure OMP, Orca, or Antigravity. For OMP/Orca execution, the user-level `~/.omp/agent/AGENTS.md` and `RULES.md` take precedence: Opus 5.5 planner, gated Gemini High workers, and, for this project by explicit user decision (2026-09-26), an Opus 5.5 supervisor instead of the global Sonnet 5 default. Do not treat a Codex/Zed model ID as available in OMP unless its provider route is independently confirmed.
 
 ## Team and responsibilities
 

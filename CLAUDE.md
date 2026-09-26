@@ -28,10 +28,10 @@ Local pytest is only installed in the project venv, not system `python3`.
 ```
 Build:      pip install -e '.[dev]'            # or: use existing .venv
 Test:       .venv/bin/python -m pytest -q
-Release:    make PYTHON=.venv/bin/python test-release   # doctor + unit + integration + e2e + smoke
+Lint:       make PYTHON=.venv/bin/python lint   # ruff, pyflakes+bugbear rules (pyproject.toml)
+Release:    make PYTHON=.venv/bin/python test-release   # lint + doctor + unit + integration + e2e + smoke
 Demo:       make PYTHON=.venv/bin/python demo
-Lint:       none configured (no ruff/flake8 in this repo)
-Typecheck:  none configured (no mypy in this repo)
+Typecheck:  no gate; pyright-lsp plugin gives editor diagnostics (see .claude/settings.json)
 ```
 
 CI (`.github/workflows/ci.yml`) runs `make test-release` then `make demo` with
@@ -79,7 +79,19 @@ pre-tool-use hook, not just a convention.
   parallel Codex-driven PR workflow (`Agent_Team.md`) that owns specific
   files per task card. Check `git status`/`git diff` before editing a file
   that might already be mid-flight there.
-- Don't commit automatically; the user controls when work lands.
+- Local commits of reviewed, verified work are fine (one logical change per
+  commit); never push — the user controls when work leaves the machine.
+
+### Multi-agent workflow
+
+- **OMP/Orca (primary):** Opus 5.5 is the supervisor for this project (user
+  decision, 2026-09-26). Implementation and verification go to Gemini High
+  workers only through `agent-team-orca-start` (one worktree + one commit per
+  assignment; supervisor reviews the diff and cherry-picks). Task specs live
+  in `.agent-team/tasks/` (local, untracked); reuse their RULES/RETURN blocks.
+- **Claude Code:** `.claude/agents/` — `explorer`, `implementer`,
+  `test-worker` (Haiku), `reviewer` (Sonnet). Hand them a task packet with
+  scope, acceptance and verify command, never "improve the repo".
 
 ### Definition of done
 
