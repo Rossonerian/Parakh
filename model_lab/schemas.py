@@ -7,11 +7,12 @@ external values before records enter the rest of the system.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field, is_dataclass
+from dataclasses import fields, dataclass, field, is_dataclass
 from datetime import datetime, timezone
 from enum import Enum
 import hashlib
 import json
+import math
 import re
 from typing import Any, Mapping, Sequence
 
@@ -68,7 +69,7 @@ def require_text(value: str, field_name: str) -> str:
 
 
 def stable_json(value: Any) -> str:
-    return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+    return json.dumps(_plain(value), ensure_ascii=False, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
 
 def stable_hash(value: Any) -> str:
@@ -79,12 +80,46 @@ def _plain(value: Any) -> Any:
     if isinstance(value, Enum):
         return value.value
     if is_dataclass(value):
-        return {k: _plain(v) for k, v in asdict(value).items()}
+        return {item.name: _plain(getattr(value, item.name)) for item in fields(value)}
     if isinstance(value, Mapping):
         return {str(k): _plain(v) for k, v in value.items()}
     if isinstance(value, (list, tuple)):
         return [_plain(v) for v in value]
     return value
+
+
+class FrozenDict(dict):
+    """Detached JSON-compatible immutable record, not an arbitrary-code sandbox."""
+    def _immutable(self, *args, **kwargs):
+        raise TypeError("record mappings are immutable")
+    __setitem__ = __delitem__ = clear = pop = popitem = setdefault = update = __ior__ = _immutable
+    def __copy__(self):
+        return self
+    def __deepcopy__(self, memo):
+        return self
+
+
+def freeze_json(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        if any(not isinstance(key, str) for key in value):
+            raise ValidationError("JSON keys must be strings")
+        return FrozenDict((key, freeze_json(item)) for key, item in value.items())
+    if isinstance(value, (tuple, list)):
+        return tuple(freeze_json(item) for item in value)
+    if value is None or isinstance(value, (str, bool, int, Enum)):
+        return value
+    if isinstance(value, float) and math.isfinite(value):
+        return value
+    raise ValidationError("record values must be finite JSON-compatible values")
+
+
+def _freeze_fields(record: Any, *names: str) -> None:
+    for name in names:
+        object.__setattr__(record, name, freeze_json(getattr(record, name)))
+
+
+def _finite(value: Any) -> bool:
+    return not isinstance(value, bool) and isinstance(value, (int, float)) and (isinstance(value, int) or math.isfinite(value))
 
 
 @dataclass(frozen=True)
@@ -94,7 +129,7 @@ class RubricCriterion:
 
     def __post_init__(self) -> None:
         require_text(self.criterion, "rubric criterion")
-        if not isinstance(self.weight, (int, float)) or self.weight <= 0:
+        if not _finite(self.weight) or self.weight <= 0:
             raise ValidationError("rubric weight must be positive")
 
 
@@ -114,8 +149,10 @@ class Evaluation:
             raise ValidationError("rubric must contain criteria")
         if any(not isinstance(x, str) or not x.strip() for x in self.critical_failures):
             raise ValidationError("critical failures must be non-empty strings")
-        if self.method == "exact_json" and not isinstance(self.reference_answer, (dict, list, str, int, float, bool, type(None))):
+        if self.method == "exact_json" and not isinstance(self.reference_answer, (Mapping, list, tuple, str, int, float, bool, type(None))):
             raise ValidationError("exact_json reference must be JSON-compatible")
+        object.__setattr__(self, "rubric", tuple(self.rubric))
+        _freeze_fields(self, "reference_answer", "critical_failures")
 
 
 @dataclass(frozen=True)
@@ -124,9 +161,9 @@ class Limits:
     max_tool_calls: int
 
     def __post_init__(self) -> None:
-        if not isinstance(self.max_output_tokens, int) or self.max_output_tokens <= 0:
+        if type(self.max_output_tokens) is not int or self.max_output_tokens <= 0:
             raise ValidationError("max_output_tokens must be a positive integer")
-        if not isinstance(self.max_tool_calls, int) or self.max_tool_calls < 0:
+        if type(self.max_tool_calls) is not int or self.max_tool_calls < 0:
             raise ValidationError("max_tool_calls must be a non-negative integer")
 
 
@@ -165,7 +202,7 @@ class Case:
         require_text(self.suite_version, "suite_version")
         if self.split not in SPLITS:
             raise ValidationError(f"invalid split: {self.split}")
-        if self.complexity_level not in DIFFICULTIES:
+        if type(self.complexity_level) is not int or self.complexity_level not in DIFFICULTIES:
             raise ValidationError("complexity_level must be 1, 2, 3, or 4")
         if self.domain not in DOMAINS:
             raise ValidationError(f"invalid domain: {self.domain}")
@@ -174,10 +211,11 @@ class Case:
         if not self.messages:
             raise ValidationError("messages cannot be empty")
         for message in self.messages:
-            if not isinstance(message, dict) or message.get("role") not in {"system", "user", "assistant", "tool"}:
+            if not isinstance(message, Mapping) or set(message) != {"role", "content"} or message.get("role") not in {"system", "user", "assistant", "tool"}:
                 raise ValidationError("messages must contain valid role/content records")
             require_text(message.get("content", ""), "message content")
         require_text(self.fixture_policy, "fixture_policy")
+        _freeze_fields(self, "messages", "tags")
 
     @property
     def prompt_hash(self) -> str:
@@ -212,6 +250,11 @@ class Suite:
             raise ValidationError("suite must contain family IDs")
         if any(case.suite_version != self.suite_version for case in self.cases):
             raise ValidationError("case/suite version mismatch")
+        splits: dict[str, str] = {}
+        for case in self.cases:
+            if splits.setdefault(case.family_id, case.split) != case.split:
+                raise ValidationError("all cases in a family must share one split")
+        object.__setattr__(self, "cases", tuple(self.cases))
 
     @property
     def case_ids(self) -> tuple[str, ...]:
@@ -242,9 +285,10 @@ class ModelConfig:
         # non-whitespace string but are not local record IDs.
         if not isinstance(self.model, str) or not self.model.strip() or len(self.model) > 256 or any(char.isspace() for char in self.model):
             raise ValidationError("model must be a bounded non-whitespace identifier")
-        if not isinstance(self.parameters, dict):
+        if not isinstance(self.parameters, Mapping):
             raise ValidationError("parameters must be an object")
         require_text(self.context_condition, "context_condition")
+        _freeze_fields(self, "parameters")
 
 
 @dataclass(frozen=True)
@@ -258,9 +302,9 @@ class Budget:
     def __post_init__(self) -> None:
         for name in ("max_cases", "max_requests", "max_cost_minor"):
             value = getattr(self, name)
-            if value is not None and (not isinstance(value, int) or value < 0):
+            if value is not None and (type(value) is not int or value < 0):
                 raise ValidationError(f"{name} must be a non-negative integer or null")
-        if self.max_runtime_seconds is not None and self.max_runtime_seconds < 0:
+        if self.max_runtime_seconds is not None and (not _finite(self.max_runtime_seconds) or self.max_runtime_seconds < 0):
             raise ValidationError("max_runtime_seconds must be non-negative or null")
         if self.max_cost_minor is not None and not self.currency:
             raise ValidationError("currency is required when max_cost_minor is set")
@@ -277,14 +321,24 @@ class Run:
     started_at: str
     status: str = "created"
     environment: dict[str, str] = field(default_factory=dict)
+    prompt_hashes: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         require_id(self.run_id, "run_id")
         require_text(self.suite_version, "suite_version")
         if not self.case_ids:
             raise ValidationError("run must contain cases")
+        if len(set(self.case_ids)) != len(self.case_ids):
+            raise ValidationError("run case IDs must be unique")
+        for case_id in self.case_ids:
+            require_id(case_id, "case_id")
+        if self.prompt_hashes and set(self.prompt_hashes) != set(self.case_ids):
+            raise ValidationError("run prompt hashes must cover the exact case set")
+        if any(not isinstance(value, str) or not re.fullmatch(r"[0-9a-f]{64}", value) for value in self.prompt_hashes.values()):
+            raise ValidationError("run prompt hashes must be SHA-256 digests")
         if self.status not in {"created", "running", "completed", "partial", "failed", "cancelled"}:
             raise ValidationError(f"invalid run status: {self.status}")
+        _freeze_fields(self, "case_ids", "environment", "prompt_hashes")
 
 
 @dataclass(frozen=True)
@@ -297,7 +351,7 @@ class Attempt:
     prompt_hash: str
     response_text: str | None
     status: AttemptStatus
-    started_at: str
+    started_at: str | None
     completed_at: str | None = None
     finish_reason: str | None = None
     error: str | None = None
@@ -317,16 +371,19 @@ class Attempt:
             raise ValidationError("response_text must be text or null")
         for name in ("first_token_latency_ms", "completion_latency_ms"):
             value = getattr(self, name)
-            if value is not None and value < 0:
+            if value is not None and (not _finite(value) or value < 0):
                 raise ValidationError(f"{name} must be non-negative or null")
         for name in ("input_tokens", "output_tokens", "cost_minor"):
             value = getattr(self, name)
-            if value is not None and (not isinstance(value, int) or value < 0):
+            if value is not None and (type(value) is not int or value < 0):
                 raise ValidationError(f"{name} must be a non-negative integer or null")
         if self.cost_minor is not None and not self.currency:
             raise ValidationError("currency is required with cost_minor")
         if not isinstance(self.raw_metadata, dict):
             raise ValidationError("raw_metadata must be an object")
+        if not isinstance(self.status, AttemptStatus):
+            raise ValidationError("status must be an AttemptStatus")
+        _freeze_fields(self, "raw_metadata", "metric_kinds")
 
 
 @dataclass(frozen=True)
@@ -347,13 +404,16 @@ class Grade:
             require_id(getattr(self, name), name)
         if self.method not in EVALUATION_METHODS | {"human", "model_judge"}:
             raise ValidationError(f"unsupported grade method: {self.method}")
-        if self.score is not None and not 0 <= self.score <= 1:
+        if self.score is not None and (not _finite(self.score) or not 0 <= self.score <= 1):
             raise ValidationError("grade score must be between 0 and 1")
         if self.passed is None and self.score is None:
             if not self.failure_reason:
                 raise ValidationError("abstained grade needs a reason")
         if not isinstance(self.evidence, dict):
             raise ValidationError("grade evidence must be an object")
+        if self.passed is not None and not isinstance(self.passed, bool):
+            raise ValidationError("grade passed must be boolean or null")
+        _freeze_fields(self, "evidence")
 
 
 @dataclass(frozen=True)
@@ -368,6 +428,7 @@ class HumanReview:
     notes: str | None
     confidence: float | None
     created_at: str
+    attempt_id: str | None = None
 
     def __post_init__(self) -> None:
         for name in ("review_id", "run_id", "case_id", "blind_label", "reviewer_pseudonym"):
@@ -376,8 +437,10 @@ class HumanReview:
             raise ValidationError("invalid human review decision")
         for name in ("score", "confidence"):
             value = getattr(self, name)
-            if value is not None and not 0 <= value <= 1:
+            if value is not None and (not _finite(value) or not 0 <= value <= 1):
                 raise ValidationError(f"{name} must be between 0 and 1")
+        if self.attempt_id is not None:
+            require_id(self.attempt_id, "attempt_id")
 
 
 @dataclass(frozen=True)
@@ -392,6 +455,7 @@ class ProvenanceRecord:
     def __post_init__(self) -> None:
         for name in ("record_id", "source_type", "source_label", "source_hash"):
             require_id(getattr(self, name), name)
+        _freeze_fields(self, "metadata")
 
 
 def to_dict(value: Any) -> dict[str, Any] | list[Any] | Any:

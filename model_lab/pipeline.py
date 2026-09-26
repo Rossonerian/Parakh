@@ -29,7 +29,7 @@ def _candidate_output(case: Any, *, incorrect: bool = False) -> str:
                 return value + 1
             if isinstance(value, str):
                 return "wrong"
-            if isinstance(value, list):
+            if isinstance(value, (list, tuple)):
                 return [wrong(item) for item in value] or ["wrong"]
             if isinstance(value, dict):
                 return {key: wrong(item) for key, item in value.items()}
@@ -50,6 +50,7 @@ def _run_for_suite(suite: Any, *, run_id: str, model: str, seed: int, budget: Bu
         budget=budget,
         started_at=utc_now(),
         environment={"mode": "offline_synthetic", "suite_hash": suite.source_hash or "unknown"},
+        prompt_hashes={case.case_id: case.prompt_hash for case in suite.cases},
     )
 
 
