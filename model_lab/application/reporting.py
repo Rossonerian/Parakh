@@ -75,13 +75,46 @@ def _latency(rows: list[dict[str, Any]]) -> dict[str, Any]:
 
 
 def _cost(rows: list[dict[str, Any]]) -> dict[str, Any]:
-    known = [row for row in rows if isinstance(row.get("cost_minor"), int) and not isinstance(row.get("cost_minor"), bool)]
-    currencies = {row.get("currency") for row in known if row.get("currency")}
-    complete = len(known) == len(rows) and bool(rows) and len(currencies) == 1
-    return {"observed_subtotal_minor": sum(row["cost_minor"] for row in known) if known else None,
-            "currency": next(iter(currencies)) if len(currencies) == 1 else None,
-            "known_count": len(known), "unknown_count": len(rows) - len(known), "complete": complete,
-            "total_minor": sum(row["cost_minor"] for row in known) if complete else None}
+    known = [
+        row for row in rows
+        if isinstance(row.get("cost_minor"), (int, float)) and not isinstance(row.get("cost_minor"), bool)
+    ]
+    currencies = {row.get("currency") for row in known}
+    has_missing_currency = (None in currencies) or ("" in currencies)
+    valid_currencies = {c for c in currencies if c not in (None, "")}
+
+    if not known:
+        currency_consistent = True
+        currency = None
+    elif has_missing_currency or len(valid_currencies) > 1:
+        currency_consistent = False
+        currency = None
+    else:
+        currency_consistent = True
+        currency = next(iter(valid_currencies))
+
+    complete = (
+        len(known) == len(rows)
+        and bool(rows)
+        and currency_consistent
+        and (currency is not None)
+    )
+    observed_subtotal = (
+        sum(row["cost_minor"] for row in known)
+        if (known and currency_consistent)
+        else None
+    )
+    total_minor = sum(row["cost_minor"] for row in known) if complete else None
+
+    return {
+        "observed_subtotal_minor": observed_subtotal,
+        "currency": currency,
+        "currency_consistent": currency_consistent,
+        "known_count": len(known),
+        "unknown_count": len(rows) - len(known),
+        "complete": complete,
+        "total_minor": total_minor,
+    }
 
 
 def _quality(rows: list[dict[str, Any]]) -> dict[str, Any]:
@@ -140,9 +173,18 @@ def build_report(records: Iterable[Any], *, metadata: Mapping[str, Any] | None =
         ],
         "rows": rows,
     }
-    verified = [row for row in rows if row.get("score") is not None and row.get("critical_assessment") not in (None, "unassessed")]
+    verified = [
+        row for row in rows
+        if row.get("passed") is True and row.get("critical_assessment") not in (None, "unassessed")
+    ]
+    verified_success_count = len(verified)
+    report["summary"]["verified_success_count"] = verified_success_count
     cost = report["summary"]["cost_minor"]
-    report["summary"]["cost_per_verified_success"] = (cost["total_minor"] / len(verified) if cost.get("complete") and verified else None)
+    report["summary"]["cost_per_verified_success"] = (
+        (cost["total_minor"] / verified_success_count)
+        if cost.get("complete") and cost.get("total_minor") is not None and verified_success_count > 0
+        else None
+    )
     return report
 
 
@@ -168,16 +210,29 @@ def render_csv(report: Mapping[str, Any]) -> str:
     return stream.getvalue()
 
 
+def _markdown_label_escape(value: Any) -> str:
+    if value is None:
+        return "unknown"
+    text = str(value)
+    text = text.replace("\r\n", " ").replace("\r", " ").replace("\n", " ")
+    text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+    text = text.replace("|", "\\|")
+    return text
+
+
 def render_markdown(report: Mapping[str, Any]) -> str:
     summary = report.get("summary", {})
     quality = summary.get("quality", {})
     coverage = summary.get("coverage", {})
+    cost_per_vs = summary.get("cost_per_verified_success")
+    mean_score = quality.get("mean_score")
+
     lines = [
         "# ModelLab report",
         "",
-        f"- Report version: `{report.get('report_version', 'unknown')}`",
+        f"- Report version: `{_markdown_label_escape(report.get('report_version', 'unknown'))}`",
         f"- Rows: `{summary.get('row_count', 0)}`",
-        f"- Mean score: `{quality.get('mean_score') if quality.get('mean_score') is not None else 'unknown'}`",
+        f"- Mean score: `{_markdown_label_escape(mean_score) if mean_score is not None else 'unknown'}`",
         f"- Quality known/unknown: `{quality.get('known_count', 0)}/{quality.get('unknown_count', 0)}`",
         "",
         "## Coverage and unknown metrics",
@@ -188,15 +243,239 @@ def render_markdown(report: Mapping[str, Any]) -> str:
     for name in ("quality", "latency_ms", "cost_minor"):
         metric = summary.get(name, {})
         lines.append(f"| {name} | {metric.get('known_count', 0)} | {metric.get('unknown_count', 0)} |")
-    lines += ["", f"- Cost per verified success: `{summary.get('cost_per_verified_success', 'unknown')}`", "", "## By model", "", "| Model | Rows | Mean score |", "| --- | ---: | ---: |"]
+    lines += [
+        "",
+        f"- Cost per verified success: `{_markdown_label_escape(cost_per_vs) if cost_per_vs is not None else 'unknown'}`",
+        f"- Verified successes: `{summary.get('verified_success_count', 0)}`",
+        "",
+        "## By model",
+        "",
+        "| Model | Rows | Mean score |",
+        "| --- | ---: | ---: |",
+    ]
     for model, values in report.get("by_model", {}).items():
-        lines.append(f"| {model.replace('|', '\\|')} | {values['count']} | {values['quality'].get('mean_score', 'unknown')} |")
-    lines += ["", "## By context condition", "", "| Condition | Rows | Mean score |", "| --- | ---: | ---: |"]
+        score = values["quality"].get("mean_score")
+        score_str = "unknown" if score is None else str(score)
+        lines.append(f"| {_markdown_label_escape(model)} | {values['count']} | {_markdown_label_escape(score_str)} |")
+    lines += [
+        "",
+        "## By context condition",
+        "",
+        "| Condition | Rows | Mean score |",
+        "| --- | ---: | ---: |",
+    ]
     for condition, values in report.get("by_context_condition", {}).items():
-        lines.append(f"| {condition.replace('|', '\\|')} | {values['count']} | {values['quality'].get('mean_score', 'unknown')} |")
-    lines += ["", "## Provenance", "", "```json", json.dumps(report.get("provenance", {}), sort_keys=True), "```", "", "## Limitations", ""]
-    lines.extend(f"- {item}" for item in report.get("limitations", []))
+        score = values["quality"].get("mean_score")
+        score_str = "unknown" if score is None else str(score)
+        lines.append(f"| {_markdown_label_escape(condition)} | {values['count']} | {_markdown_label_escape(score_str)} |")
+    lines += [
+        "",
+        "## Provenance",
+        "",
+        "```json",
+        json.dumps(report.get("provenance", {}), sort_keys=True),
+        "```",
+        "",
+        "## Limitations",
+        "",
+    ]
+    lines.extend(f"- {_markdown_label_escape(item)}" for item in report.get("limitations", []))
     return "\n".join(lines) + "\n"
+
+
+def _svg_quality_by_model_domain(report: Mapping[str, Any]) -> str:
+    by_model = report.get("by_model", {})
+    by_domain = report.get("by_domain", {})
+
+    has_domain = any("domain" in r for r in report.get("rows", []))
+    has_model = any("model" in r for r in report.get("rows", []))
+
+    model_scores = {
+        model: values["quality"].get("mean_score")
+        for model, values in by_model.items()
+        if model != "unknown" or has_model
+    }
+    domain_scores = {
+        domain: values["quality"].get("mean_score")
+        for domain, values in by_domain.items()
+        if domain != "unknown" or has_domain
+    }
+
+    known_model = {k: v for k, v in model_scores.items() if v is not None}
+    known_domain = {k: v for k, v in domain_scores.items() if v is not None}
+
+    width, height = 760, 320
+    title = "Quality by model / domain"
+    safe_title = html.escape(title, quote=True)
+
+    if not known_model and not known_domain:
+        return (
+            f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="160" role="img" aria-label="{safe_title}">\n'
+            f'  <text x="20" y="30" font-size="16" font-weight="bold">{safe_title}</text>\n'
+            f'  <rect x="20" y="50" width="720" height="80" fill="#f8f9fa" stroke="#e0e0e0" rx="4"/>\n'
+            f'  <text x="40" y="95" font-size="14" fill="#666">unknown (no data)</text>\n'
+            f'</svg>\n'
+        )
+
+    svg_elements = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" role="img" aria-label="{safe_title}">\n',
+        f'  <text x="20" y="30" font-size="16" font-weight="bold">{safe_title}</text>\n',
+        '  <line x1="390" y1="50" x2="390" y2="280" stroke="#eee" stroke-width="2"/>\n',
+    ]
+
+    # Models column
+    svg_elements.append('  <text x="40" y="60" font-size="13" font-weight="bold" fill="#555">By Model</text>\n')
+    if not known_model:
+        svg_elements.append('  <text x="40" y="100" font-size="13" fill="#888">unknown (no data)</text>\n')
+    else:
+        panel_width = 330
+        bar_width = max(1, (panel_width - 20) // max(1, len(model_scores)))
+        max_val = max(known_model.values(), default=1.0) or 1.0
+        svg_elements.append('  <line x1="40" y1="240" x2="370" y2="240" stroke="#bbb"/>\n')
+        for idx, (model, score) in enumerate(sorted(model_scores.items())):
+            x = 40 + idx * bar_width
+            safe_label = html.escape(str(model), quote=True)
+            if score is None:
+                svg_elements.append(
+                    f'  <text x="{x}" y="225" font-size="11" fill="#888">unknown</text>\n'
+                    f'  <text x="{x}" y="255" font-size="11" transform="rotate(30 {x} 255)">{safe_label}</text>\n'
+                )
+            else:
+                bar_h = int(160 * max(0.0, score) / max_val)
+                y = 240 - bar_h
+                svg_elements.append(
+                    f'  <rect x="{x}" y="{y}" width="{max(1, bar_width - 8)}" height="{bar_h}" fill="#3568a8">'
+                    f'<title>{safe_label}: {score:.4g}</title></rect>\n'
+                    f'  <text x="{x}" y="255" font-size="11" transform="rotate(30 {x} 255)">{safe_label}</text>\n'
+                )
+
+    # Domains column
+    svg_elements.append('  <text x="410" y="60" font-size="13" font-weight="bold" fill="#555">By Domain</text>\n')
+    if not known_domain:
+        svg_elements.append('  <text x="410" y="100" font-size="13" fill="#888">unknown (no data)</text>\n')
+    else:
+        panel_width = 330
+        bar_width = max(1, (panel_width - 20) // max(1, len(domain_scores)))
+        max_val = max(known_domain.values(), default=1.0) or 1.0
+        svg_elements.append('  <line x1="410" y1="240" x2="740" y2="240" stroke="#bbb"/>\n')
+        for idx, (domain, score) in enumerate(sorted(domain_scores.items())):
+            x = 410 + idx * bar_width
+            safe_label = html.escape(str(domain), quote=True)
+            if score is None:
+                svg_elements.append(
+                    f'  <text x="{x}" y="225" font-size="11" fill="#888">unknown</text>\n'
+                    f'  <text x="{x}" y="255" font-size="11" transform="rotate(30 {x} 255)">{safe_label}</text>\n'
+                )
+            else:
+                bar_h = int(160 * max(0.0, score) / max_val)
+                y = 240 - bar_h
+                svg_elements.append(
+                    f'  <rect x="{x}" y="{y}" width="{max(1, bar_width - 8)}" height="{bar_h}" fill="#4a7c59">'
+                    f'<title>{safe_label}: {score:.4g}</title></rect>\n'
+                    f'  <text x="{x}" y="255" font-size="11" transform="rotate(30 {x} 255)">{safe_label}</text>\n'
+                )
+
+    svg_elements.append('</svg>\n')
+    return "".join(svg_elements)
+
+
+def _svg_cost_vs_verified_success(summary: Mapping[str, Any]) -> str:
+    cost = summary.get("cost_minor", {})
+    total = cost.get("total_minor")
+    currency = cost.get("currency")
+    complete = cost.get("complete", False)
+    verified_count = summary.get("verified_success_count", 0)
+    cost_per_vs = summary.get("cost_per_verified_success")
+
+    width, height = 760, 200
+    title = "Cost versus verified success"
+    safe_title = html.escape(title, quote=True)
+
+    cost_known = complete and (total is not None) and (currency is not None)
+    if not cost_known:
+        return (
+            f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" role="img" aria-label="{safe_title}">\n'
+            f'  <text x="20" y="30" font-size="16" font-weight="bold">{safe_title}</text>\n'
+            f'  <rect x="20" y="50" width="720" height="120" fill="#f8f9fa" stroke="#e0e0e0" rx="4"/>\n'
+            f'  <text x="40" y="85" font-size="14" fill="#666">Cost: unknown (no data)</text>\n'
+            f'  <text x="40" y="115" font-size="14" fill="#333">Verified successes: {verified_count}</text>\n'
+            f'  <text x="40" y="145" font-size="14" fill="#666">Cost per verified success: unknown</text>\n'
+            f'</svg>\n'
+        )
+
+    safe_currency = html.escape(str(currency), quote=True)
+    if verified_count > 0 and cost_per_vs is not None:
+        cost_per_vs_text = f"{cost_per_vs:.4g} {safe_currency}"
+    else:
+        cost_per_vs_text = "unknown (0 verified successes)"
+
+    return (
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" role="img" aria-label="{safe_title}">\n'
+        f'  <text x="20" y="30" font-size="16" font-weight="bold">{safe_title}</text>\n'
+        f'  <rect x="20" y="50" width="220" height="120" fill="#f0f4f8" stroke="#cbd5e1" rx="6"/>\n'
+        f'  <text x="40" y="80" font-size="12" fill="#64748b" font-weight="bold">TOTAL COST</text>\n'
+        f'  <text x="40" y="115" font-size="18" fill="#1e293b" font-weight="bold">{total} {safe_currency}</text>\n'
+        f'  <rect x="260" y="50" width="220" height="120" fill="#f0fdf4" stroke="#bbf7d0" rx="6"/>\n'
+        f'  <text x="280" y="80" font-size="12" fill="#16a34a" font-weight="bold">VERIFIED SUCCESSES</text>\n'
+        f'  <text x="280" y="115" font-size="18" fill="#1e293b" font-weight="bold">{verified_count}</text>\n'
+        f'  <rect x="500" y="50" width="240" height="120" fill="#faf5ff" stroke="#e9d5ff" rx="6"/>\n'
+        f'  <text x="520" y="80" font-size="12" fill="#9333ea" font-weight="bold">COST / VERIFIED SUCCESS</text>\n'
+        f'  <text x="520" y="115" font-size="18" fill="#1e293b" font-weight="bold">{cost_per_vs_text}</text>\n'
+        f'</svg>\n'
+    )
+
+
+def _svg_context_condition(report: Mapping[str, Any]) -> str:
+    by_context = report.get("by_context_condition", {})
+    has_context = any("context_condition" in r for r in report.get("rows", []))
+    context_scores = {
+        cond: values["quality"].get("mean_score")
+        for cond, values in by_context.items()
+        if cond != "unknown" or has_context
+    }
+    known_scores = {k: v for k, v in context_scores.items() if v is not None}
+
+    width, height = 760, 260
+    title = "Performance by context condition"
+    safe_title = html.escape(title, quote=True)
+
+    if not known_scores:
+        return (
+            f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="160" role="img" aria-label="{safe_title}">\n'
+            f'  <text x="20" y="30" font-size="16" font-weight="bold">{safe_title}</text>\n'
+            f'  <rect x="20" y="50" width="720" height="80" fill="#f8f9fa" stroke="#e0e0e0" rx="4"/>\n'
+            f'  <text x="40" y="95" font-size="14" fill="#666">unknown (no data)</text>\n'
+            f'</svg>\n'
+        )
+
+    bar_width = max(1, (width - 100) // max(1, len(context_scores)))
+    max_val = max(known_scores.values(), default=1.0) or 1.0
+
+    svg_elements = [
+        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" role="img" aria-label="{safe_title}">\n',
+        f'  <text x="20" y="30" font-size="16" font-weight="bold">{safe_title}</text>\n',
+        '  <line x1="50" y1="200" x2="720" y2="200" stroke="#bbb"/>\n',
+    ]
+
+    for idx, (cond, score) in enumerate(sorted(context_scores.items())):
+        x = 50 + idx * bar_width
+        safe_label = html.escape(str(cond), quote=True)
+        if score is None:
+            svg_elements.append(
+                f'  <text x="{x}" y="185" font-size="11" fill="#888">unknown</text>\n'
+                f'  <text x="{x}" y="220" font-size="11" transform="rotate(30 {x} 220)">{safe_label}</text>\n'
+            )
+        else:
+            bar_h = int(140 * max(0.0, score) / max_val)
+            y = 200 - bar_h
+            svg_elements.append(
+                f'  <rect x="{x}" y="{y}" width="{max(1, bar_width - 8)}" height="{bar_h}" fill="#5c6ac4">'
+                f'<title>{safe_label}: {score:.4g}</title></rect>\n'
+                f'  <text x="{x}" y="220" font-size="11" transform="rotate(30 {x} 220)">{safe_label}</text>\n'
+            )
+
+    svg_elements.append('</svg>\n')
+    return "".join(svg_elements)
 
 
 def render_html(report: Mapping[str, Any]) -> str:
@@ -209,10 +488,19 @@ def render_html(report: Mapping[str, Any]) -> str:
         "<tr>" + "".join(f"<td>{esc(row.get(field))}</td>" for field in ("attempt_id", "case_id", "model", "status", "score", "latency_ms", "response_text")) + "</tr>"
         for row in report.get("rows", [])
     )
+
+    svg_quality = _svg_quality_by_model_domain(report)
+    svg_cost = _svg_cost_vs_verified_success(summary)
+    svg_context = _svg_context_condition(report)
+
     return (
         "<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\"><title>ModelLab report</title>"
-        "<style>body{font-family:sans-serif;max-width:1100px;margin:2rem auto;padding:0 1rem}table{border-collapse:collapse;width:100%}th,td{border:1px solid #bbb;padding:.35rem;text-align:left}th{background:#eee}</style>"
+        "<style>body{font-family:sans-serif;max-width:1100px;margin:2rem auto;padding:0 1rem}table{border-collapse:collapse;width:100%}th,td{border:1px solid #bbb;padding:.35rem;text-align:left}th{background:#eee}.report-view{margin:2rem 0}</style>"
         f"</head><body><h1>ModelLab report</h1><p>Rows: {esc(summary.get('row_count'))}; mean score: {esc(quality.get('mean_score'))}</p>"
+        "<h2>Views</h2>"
+        f"<section class=\"report-view\">{svg_quality}</section>"
+        f"<section class=\"report-view\">{svg_cost}</section>"
+        f"<section class=\"report-view\">{svg_context}</section>"
         "<h2>Attempts</h2><table><thead><tr><th>Attempt</th><th>Case</th><th>Model</th><th>Status</th><th>Score</th><th>Latency (ms)</th><th>Response</th></tr></thead>"
         f"<tbody>{table_rows}</tbody></table><h2>Limitations</h2><ul>"
         + "".join(f"<li>{esc(item)}</li>" for item in report.get("limitations", []))
@@ -222,6 +510,15 @@ def render_html(report: Mapping[str, Any]) -> str:
 
 def _svg_bars(values: Mapping[str, float], title: str) -> str:
     width, height = 760, 400
+    safe_title = html.escape(title, quote=True)
+    if not values:
+        return (
+            f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="160" role="img" aria-label="{safe_title}">\n'
+            f'  <text x="20" y="30" font-size="18" font-weight="bold">{safe_title}</text>\n'
+            f'  <rect x="20" y="50" width="720" height="80" fill="#f8f9fa" stroke="#e0e0e0" rx="4"/>\n'
+            f'  <text x="40" y="95" font-size="14" fill="#666">unknown (no data)</text>\n'
+            f'</svg>\n'
+        )
     max_value = max(values.values(), default=1.0) or 1.0
     bar_width = max(1, (width - 80) // max(1, len(values)))
     bars = []
@@ -229,10 +526,10 @@ def _svg_bars(values: Mapping[str, float], title: str) -> str:
         x = 50 + index * bar_width
         bar_height = int(280 * max(0.0, value) / max_value)
         y = 330 - bar_height
-        safe_label = html.escape(label, quote=True)
+        safe_label = html.escape(str(label), quote=True)
         bars.append(f'<rect x="{x}" y="{y}" width="{max(1, bar_width - 8)}" height="{bar_height}" fill="#3568a8"><title>{safe_label}: {value:.4g}</title></rect>')
         bars.append(f'<text x="{x}" y="350" font-size="11" transform="rotate(30 {x} 350)">{safe_label}</text>')
-    return f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" role="img" aria-label="{html.escape(title, quote=True)}"><text x="20" y="25" font-size="18">{html.escape(title)}</text><line x1="45" y1="330" x2="740" y2="330" stroke="#333"/>{"".join(bars)}</svg>\n'
+    return f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" role="img" aria-label="{safe_title}"><text x="20" y="25" font-size="18">{safe_title}</text><line x1="45" y1="330" x2="740" y2="330" stroke="#333"/>{"".join(bars)}</svg>\n'
 
 
 def _write_optional_png(path: Path, values: Mapping[str, float], title: str) -> bool:
