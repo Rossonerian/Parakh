@@ -9,6 +9,7 @@ store, so progress reflects real execution.
 
 from __future__ import annotations
 
+import sqlite3
 import threading
 from pathlib import Path
 from typing import Any, Callable
@@ -191,8 +192,15 @@ class ParakhApp(App[None]):
         finally:
             store.close()
 
-    @work(thread=True, exclusive=True, group="refresh")
+    @work(thread=True, exclusive=True, group="refresh", exit_on_error=False)
     def refresh_state(self, force: bool = False) -> None:
+        try:
+            self._refresh(force)
+        except (sqlite3.Error, ModelLabError, OSError):
+            # e.g. "database is locked" while an action is creating the DB; retry next tick
+            self._dirty = True
+
+    def _refresh(self, force: bool) -> None:
         latest = self._latest_event_id()
         running = bool(self.state and self.state.snapshot.active)
         if not (force or self._dirty or running or latest != self.last_event_id):
@@ -211,8 +219,11 @@ class ParakhApp(App[None]):
         for key, value in self.session.items():
             setattr(state, key, value)
         self.state = state
-        if state.selected_run is not None:
-            self.selected_run_id = state.selected_run.run_id
+        run_ids = {run.run_id for run in state.snapshot.runs}
+        if self.selected_run_id not in run_ids and state.selected_run is not None:
+            self.selected_run_id = state.selected_run.run_id  # adopt the default only when nothing valid is selected
+        elif state.selected_run is not None and state.selected_run.run_id != self.selected_run_id:
+            self._dirty = True  # built for an older selection; the next tick rebuilds for the current one
         for view_type in (DashboardView, SuitesView, CasesView, ModelsView, RunsView, RunDetailView, ResultsView, CompareView, ReviewView, RoutingView):
             try:
                 self.query_one(view_type).show(state)

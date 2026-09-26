@@ -5,13 +5,14 @@ import pytest
 
 pytest.importorskip("textual")
 
-from textual.widgets import DataTable, RichLog  # noqa: E402
+from textual.widgets import DataTable, RichLog
 
-from model_lab.application import lab_actions  # noqa: E402
-from model_lab.application.events import record_event  # noqa: E402
-from model_lab.storage import SQLiteStore  # noqa: E402
-from model_lab.tui.app import ParakhApp  # noqa: E402
-from model_lab.tui.views import DashboardView  # noqa: E402
+from model_lab.application import lab_actions
+from model_lab.application.events import record_event
+from model_lab.storage import SQLiteStore
+from model_lab.tui.app import ParakhApp
+from model_lab.tui.state import SuiteCache, build_state
+from model_lab.tui.views import DashboardView
 
 ROOT = Path(__file__).resolve().parents[1]
 SUITE = ROOT / "benchmarks/seed_cases.jsonl"
@@ -144,4 +145,25 @@ def test_console_has_no_paid_dispatch_path(tmp_path, monkeypatch):
             await _until(pilot, lambda: app.state is not None and app.state.preflight is not None)
             result = _text(app.query_one("#pilot-result"))
             assert "disabled" in result and "blocked" in result
+    run(scenario())
+
+
+def test_run_selection_survives_background_refreshes(tmp_path):
+    first = lab_actions.run_fake(tmp_path, SUITE, max_cases=2, pacing_seconds=0)["run_id"]
+    second = lab_actions.run_fake(tmp_path, SUITE, max_cases=2, pacing_seconds=0)["run_id"]
+
+    async def scenario():
+        app = ParakhApp(data_dir=tmp_path, suite_path=SUITE, poll_seconds=0.05)
+        async with app.run_test(size=(160, 50)) as pilot:
+            await _until(pilot, lambda: app.state is not None and len(app.state.snapshot.runs) == 2)
+            await pilot.press("5")
+            app.query_one("#runs-table", DataTable).focus()
+            await pilot.press("down")
+            await _until(pilot, lambda: app.selected_run_id == first)
+            # A refresh that started before the highlight finishes afterwards: it carries the old selection.
+            stale = build_state(tmp_path, SUITE, SuiteCache(), selected_run_id=second)
+            app.apply_state(stale, app._applied + 1)
+            assert app.selected_run_id == first
+            await _until(pilot, lambda: app.state.selected_run is not None and app.state.selected_run.run_id == first)
+            assert first in _text(app.query_one("#run-meta"))
     run(scenario())
