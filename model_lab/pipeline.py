@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -107,18 +108,20 @@ def grade_run(suite: Any, store: SQLiteStore, attempts: list[Any]) -> list[Any]:
     return grades
 
 
-def _execute_model(suite: Any, store: SQLiteStore, *, run_id: str, model: str, seed: int, incorrect: bool, provider_delay_seconds: float = 0.0) -> tuple[Run, list[Any], list[Any], list[dict[str, Any]]]:
+def _execute_model(suite: Any, store: SQLiteStore, *, run_id: str, model: str, seed: int, incorrect: bool, provider_delay_seconds: float = 0.0,
+                   cancel_event: threading.Event | None = None) -> tuple[Run, list[Any], list[Any], list[dict[str, Any]]]:
     outputs = {case.case_id: _candidate_output(case, incorrect=incorrect) for case in suite.cases}
     provider = FakeProvider(variant=FakeVariant.CORRECT, outputs=outputs, model=model, delay_seconds=provider_delay_seconds)
     run = _run_for_suite(suite, run_id=run_id, model=model, seed=seed, budget=Budget(max_cases=len(suite.cases), max_requests=len(suite.cases)), pacing_delay_seconds=provider_delay_seconds)
-    result = ExecutionEngine(store, provider).execute(suite, run)
+    result = ExecutionEngine(store, provider).execute(suite, run, cancel_event=cancel_event)
     grades = grade_run(suite, store, list(result.attempts))
     rows = _rows(suite, list(result.attempts), grades)
     return run, list(result.attempts), grades, rows
 
 
 def run_offline_demo(suite_path: str | Path, output_dir: str | Path, *, seed: int = 7, database: str | Path | None = None,
-                     run_id_prefix: str = "run", provider_delay_seconds: float = 0.0) -> dict[str, Any]:
+                     run_id_prefix: str = "run", provider_delay_seconds: float = 0.0,
+                     cancel_event: threading.Event | None = None) -> dict[str, Any]:
     """Run two explicitly synthetic 60-case models through every local layer.
 
     ``database`` defaults to ``output_dir/model_lab.sqlite3``; the TUI points it at
@@ -130,8 +133,8 @@ def run_offline_demo(suite_path: str | Path, output_dir: str | Path, *, seed: in
     store = SQLiteStore(Path(database) if database is not None else destination / "model_lab.sqlite3")
     try:
         record_event(store, "suite_loaded", f"suite {suite.suite_version} loaded: {len(suite.cases)} cases", artifact=str(suite.source_path))
-        good_run, good_attempts, good_grades, good_rows = _execute_model(suite, store, run_id=f"{run_id_prefix}-synthetic-good", model="synthetic-good", seed=seed, incorrect=False, provider_delay_seconds=provider_delay_seconds)
-        bad_run, bad_attempts, bad_grades, bad_rows = _execute_model(suite, store, run_id=f"{run_id_prefix}-synthetic-incorrect", model="synthetic-incorrect", seed=seed, incorrect=True, provider_delay_seconds=provider_delay_seconds)
+        good_run, good_attempts, good_grades, good_rows = _execute_model(suite, store, run_id=f"{run_id_prefix}-synthetic-good", model="synthetic-good", seed=seed, incorrect=False, provider_delay_seconds=provider_delay_seconds, cancel_event=cancel_event)
+        bad_run, bad_attempts, bad_grades, bad_rows = _execute_model(suite, store, run_id=f"{run_id_prefix}-synthetic-incorrect", model="synthetic-incorrect", seed=seed, incorrect=True, provider_delay_seconds=provider_delay_seconds, cancel_event=cancel_event)
         comparison = compare_grades(good_grades, bad_grades, cases=suite.cases)
         routing = draft_recommendations(comparison, cases=suite.cases, eligibility={"synthetic-good": True, "synthetic-incorrect": True}, synthetic=True)
         good_report = write_report_bundle(good_rows, destination / "reports" / "synthetic-good", metadata={"run_id": good_run.run_id, "suite_version": suite.suite_version, "synthetic": True, "suite_hash": suite.source_hash})

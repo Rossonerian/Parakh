@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# Start/stop the Parakh ModelLab console from any directory.
+#
+#   parakh [start] [--demo] [tui args…]   open the console (foreground)
+#   parakh demo                           open it and run the offline SIMULATED demo if the workspace is empty
+#   parakh stop                           stop every console running on this workspace (other terminals too)
+#   parakh status                         show running consoles
+#   parakh cli <model-lab args…>          run the normal CLI from the repo root
+#
+# Env overrides: PARAKH_DATA (workspace dir), PARAKH_SUITE (suite file).
+set -euo pipefail
+
+SCRIPT="$(readlink -f "${BASH_SOURCE[0]}")"
+REPO="$(cd "$(dirname "$SCRIPT")/.." && pwd)"
+PY="$REPO/.venv/bin/python"
+DATA="$(readlink -m "${PARAKH_DATA:-$REPO/lab-data/tui}")"
+SUITE="$(readlink -m "${PARAKH_SUITE:-$REPO/benchmarks/seed_cases.jsonl}")"
+PATTERN="model_lab tui --data $DATA( |$)"
+
+die() { echo "parakh: $*" >&2; exit 1; }
+
+ensure_env() {
+    if [[ ! -x "$PY" ]]; then
+        echo "parakh: creating $REPO/.venv" >&2
+        python3 -m venv "$REPO/.venv" || die "python3 -m venv failed (need Python >= 3.12)"
+    fi
+    if ! "$PY" -c 'import textual' 2>/dev/null; then
+        echo "parakh: installing ModelLab with the tui extra" >&2
+        if "$PY" -m pip --version >/dev/null 2>&1; then
+            "$PY" -m pip install -q -e "$REPO[tui]"
+        elif command -v uv >/dev/null; then
+            uv pip install -q --python "$PY" -e "$REPO[tui]"
+        else
+            die "no pip in $REPO/.venv and no uv; run: $PY -m ensurepip && $PY -m pip install -e '$REPO[tui]'"
+        fi
+    fi
+}
+
+running_pids() { pgrep -f -- "$PATTERN" || true; }
+
+start() {
+    local pids
+    pids="$(running_pids)"
+    [[ -z "$pids" ]] || die "already running on $DATA (pid ${pids//$'\n'/ }); use 'parakh stop' or open it in that terminal"
+    ensure_env
+    cd "$REPO"
+    # Not exec'd via a pidfile: 'stop' finds the process by its command line, so a crashed console never leaves stale state.
+    "$PY" -m model_lab tui --data "$DATA" --suite "$SUITE" "$@"
+}
+
+stop() {
+    local pids
+    pids="$(running_pids)"
+    if [[ -z "$pids" ]]; then
+        echo "parakh: not running"
+        return 0
+    fi
+    kill -TERM $pids
+    for _ in $(seq 50); do
+        [[ -z "$(running_pids)" ]] && { echo "parakh: stopped (pid ${pids//$'\n'/ })"; return 0; }
+        sleep 0.1
+    done
+    kill -KILL $(running_pids) 2>/dev/null || true
+    echo "parakh: force-killed; run 'reset' in that terminal if it looks garbled" >&2
+}
+
+status() {
+    local pids
+    pids="$(running_pids)"
+    if [[ -z "$pids" ]]; then
+        echo "parakh: not running (workspace $DATA)"
+        return 1
+    fi
+    ps -o pid=,etime=,tty=,args= -p $(echo $pids | tr '\n' ',' | sed 's/,$//')
+}
+
+case "${1:-start}" in
+    start) shift || true; start "$@" ;;
+    demo) shift; start --demo "$@" ;;
+    stop) stop ;;
+    status) status ;;
+    cli) shift; ensure_env; cd "$REPO"; exec "$PY" -m model_lab "$@" ;;
+    -h|--help|help) sed -n '2,10p' "$SCRIPT" | sed 's/^# \{0,1\}//' ;;
+    -*) start "$@" ;;
+    *) die "unknown command '$1' (start|demo|stop|status|cli|help)" ;;
+esac

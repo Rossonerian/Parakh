@@ -39,11 +39,12 @@ def _store(data_dir: str | Path) -> SQLiteStore:
     return SQLiteStore(Path(data_dir) / DB_NAME)
 
 
-def run_demo(data_dir: str | Path, suite_path: str | Path, *, pacing_seconds: float = DEFAULT_PACING_SECONDS, seed: int = 7) -> dict[str, Any]:
+def run_demo(data_dir: str | Path, suite_path: str | Path, *, pacing_seconds: float = DEFAULT_PACING_SECONDS, seed: int = 7,
+             cancel_event: threading.Event | None = None) -> dict[str, Any]:
     """Two SIMULATED runs (oracle-fed "good" and deliberately wrong) + grading, reports, comparison, draft routing."""
     stamp = _stamp()
     return run_offline_demo(suite_path, Path(data_dir) / "demos" / stamp, seed=seed, database=Path(data_dir) / DB_NAME,
-                            run_id_prefix=f"demo-{stamp}", provider_delay_seconds=pacing_seconds)
+                            run_id_prefix=f"demo-{stamp}", provider_delay_seconds=pacing_seconds, cancel_event=cancel_event)
 
 
 def run_fake(data_dir: str | Path, suite_path: str | Path, *, model: str = "synthetic-v1", variant: str = FakeVariant.CORRECT.value,

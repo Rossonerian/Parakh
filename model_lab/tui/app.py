@@ -9,6 +9,8 @@ store, so progress reflects real execution.
 
 from __future__ import annotations
 
+import asyncio
+import signal
 import sqlite3
 import threading
 from pathlib import Path
@@ -132,7 +134,8 @@ class ParakhApp(App[None]):
         self.state: ConsoleState | None = None
         self.selected_run_id: str | None = None
         self.last_event_id = 0
-        self.cancel_event: threading.Event | None = None
+        self.cancel_event: threading.Event | None = None  # the console's current fake run ('x')
+        self.run_events: list[threading.Event] = []  # every running execution; set on quit so workers end promptly
         self._dirty = True
         self.busy: set[str] = set()
         self._built = 0  # monotonically increasing build number; stale builds are dropped
@@ -170,6 +173,13 @@ class ParakhApp(App[None]):
         yield Footer()
 
     def on_mount(self) -> None:
+        # `parakh stop` / closing the terminal: exit through Textual so the terminal is restored.
+        loop = asyncio.get_running_loop()
+        for sig in (signal.SIGTERM, signal.SIGHUP):
+            try:
+                loop.add_signal_handler(sig, self.shutdown)
+            except (NotImplementedError, RuntimeError, ValueError):  # non-main thread or unsupported platform
+                pass
         self.data_dir.mkdir(parents=True, exist_ok=True)
         self.set_interval(self.poll_seconds, self.poll)
         self.refresh_state(force=True)
@@ -284,16 +294,30 @@ class ParakhApp(App[None]):
     def action_refresh(self) -> None:
         self.mark_dirty()
 
+    def _new_cancel_event(self) -> threading.Event:
+        event = threading.Event()
+        self.run_events.append(event)
+        return event
+
+    def shutdown(self) -> None:
+        """Quit: stop executions before the next case (runs end 'cancelled'), then exit and restore the terminal."""
+        for event in self.run_events:
+            event.set()
+        self.exit()
+
+    async def action_quit(self) -> None:
+        self.shutdown()
+
     def action_demo(self) -> None:
-        self.start_action("offline demo", lambda: lab_actions.run_demo(self.data_dir, self.suite_path),
+        cancel = self._new_cancel_event()
+        self.start_action("offline demo", lambda: lab_actions.run_demo(self.data_dir, self.suite_path, cancel_event=cancel),
                         lambda r: f"DEMO finished: {len(r['runs'])} SIMULATED runs, comparison + draft routing written")
 
     def action_fake_run(self) -> None:
         def start(config: dict[str, Any] | None) -> None:
             if config is None:
                 return
-            self.cancel_event = threading.Event()
-            cancel = self.cancel_event
+            self.cancel_event = cancel = self._new_cancel_event()
             self.start_action("fake run", lambda: lab_actions.run_fake(self.data_dir, self.suite_path, cancel_event=cancel, **config),
                             lambda r: f"fake run {r['run_id']}: {r['status']}, {r['attempts']} attempts, {r['failures']} failed")
         self.push_screen(FakeRunScreen(), start)

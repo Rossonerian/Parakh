@@ -23,6 +23,8 @@ make PYTHON=.venv/bin/python demo           # CLI: full 60-case offline workflow
 make PYTHON=.venv/bin/python test-release   # lint + doctor + unit + integration + e2e + smoke
 ```
 
+From any directory: `scripts/parakh` (alias it, e.g. `alias parakh=/path/to/Parakh/scripts/parakh`) — `parakh` opens the console, `parakh demo` opens it with the offline demo, `parakh stop` stops a console running in another terminal, `parakh status`, `parakh cli <args>`. It bootstraps `.venv` with the `tui` extra on first use.
+
 Console navigation: `1`–`9`, `0`, `l` switch tabs (Dashboard, Suites, Cases, Models, Runs, Run detail, Results, Compare, Review, Routing, Events); `d` demo, `f` fake-provider run, `g` grade, `v` validate, `h` doctor, `r` refresh, `q` quit. Run data lives in `lab-data/tui/model_lab.sqlite3` (gitignored). Everything shown comes from that store; demo data is labelled `SIMULATED`, missing measurements show `N/A`/`not measured`, and the console cannot start paid/live calls — those remain `model-lab pilot run … --allow-paid` with a verified immutable plan. See `Model_Testing_Spec.md` → *Interactive console* and `MANUAL_TESTING.md`.
 
 Layout: `cli/` (argparse surface) → `pipeline.py`, `pilot.py` and feature modules → `application/` (execution engine, reporting, event log, observability read model, operator actions) → `domain/` (isolation, budget) → `storage/` (SQLite) and `providers/` (fake, gated live). `tui/` renders the observability read model only. Module map and invariants: `model_lab/CLAUDE.md`.
