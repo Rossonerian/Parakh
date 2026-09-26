@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import random
 from typing import Any, Iterable, Mapping
 
 from .schemas import Case, Grade
@@ -25,6 +26,8 @@ class ComparisonResult:
     limitations: tuple[str, ...] = ()
     duplicate_case_ids: tuple[str, ...] = ()
     scored_pairs: int = 0
+    condition_mismatch_case_ids: tuple[str, ...] = ()
+    uncertainty: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         result = {"left_label": self.left_label, "right_label": self.right_label, "matched_cases": self.matched_cases,
@@ -34,6 +37,8 @@ class ComparisonResult:
                 "limitations": list(self.limitations)}
         result["duplicate_case_ids"] = list(self.duplicate_case_ids)
         result["scored_pairs"] = self.scored_pairs
+        result["condition_mismatch_case_ids"] = list(self.condition_mismatch_case_ids)
+        result["uncertainty"] = self.uncertainty
         return result
 
 
@@ -64,9 +69,17 @@ def compare_grades(left: Iterable[Grade], right: Iterable[Grade], *, cases: Iter
     right_label = right_label or _model_label(right, "right")
     case_by = {case.case_id: case for case in cases}
     ids = sorted(set(left_by) & set(right_by) & set(case_by))
-    rows: list[tuple[Case, float | None, float | None]] = [(case_by[i], left_by[i].score, right_by[i].score) for i in ids]
-    left_scores = [x for _, x, _ in rows if x is not None]
-    right_scores = [x for _, _, x in rows if x is not None]
+    rows: list[tuple[Case, float | None, float | None]] = []
+    mismatches: list[str] = []
+    for case_id in ids:
+        le, re = left_by[case_id].evidence, right_by[case_id].evidence
+        if any(field in le and field in re and le[field] != re[field] for field in ("prompt_hash", "evaluation_method", "context_condition")):
+            mismatches.append(case_id)
+            continue
+        rows.append((case_by[case_id], left_by[case_id].score, right_by[case_id].score))
+    paired = [(x, y) for _, x, y in rows if x is not None and y is not None]
+    left_scores = [x for x, _ in paired]
+    right_scores = [y for _, y in paired]
 
     # Performance Optimization: Single-pass grouping of domain, family, complexity, and split
     # Avoids iterating through rows 4 separate times and calling getattr dynamically in a loop.
@@ -90,8 +103,9 @@ def compare_grades(left: Iterable[Grade], right: Iterable[Grade], *, cases: Iter
     def build_paired(grouped: dict[str, list[tuple[float | None, float | None]]]) -> dict[str, dict[str, Any]]:
         out = {}
         for value, values in sorted(grouped.items()):
-            l = [a for a, _ in values if a is not None]
-            r = [b for _, b in values if b is not None]
+            paired_values = [(a, b) for a, b in values if a is not None and b is not None]
+            l = [a for a, _ in paired_values]
+            r = [b for _, b in paired_values]
             out[value] = {
                 "n": len(values),
                 "left_n": len(l),
@@ -105,7 +119,23 @@ def compare_grades(left: Iterable[Grade], right: Iterable[Grade], *, cases: Iter
     limitations = ["Scores are paired by case and repeated family variants are not independent.", "No statistical significance is inferred by this descriptive comparison."]
     if duplicate_case_ids:
         limitations.append("Duplicate case observations were excluded from paired scores; repeats require explicit aggregation.")
+    if mismatches:
+        limitations.append("Mismatched prompt/evaluation/context conditions were excluded from paired scores.")
     scored_pairs = sum(1 for _, left_score, right_score in rows if left_score is not None and right_score is not None)
+    family_deltas: dict[str, list[float]] = {}
+    for case, left_score, right_score in rows:
+        if left_score is not None and right_score is not None:
+            family_deltas.setdefault(case.family_id, []).append(left_score - right_score)
+    family_estimates = [sum(values) / len(values) for values in family_deltas.values()]
+    uncertainty: dict[str, Any] = {"method": "cluster_bootstrap_percentile", "resampling_unit": "family_id", "seed": 17,
+                                    "resamples": 1000, "independent_families": len(family_estimates), "estimate": None, "interval": None}
+    if family_estimates:
+        uncertainty["estimate"] = sum(family_estimates) / len(family_estimates)
+    if len(family_estimates) >= 2:
+        rng = random.Random(17)
+        samples = [sum(rng.choice(family_estimates) for _ in family_estimates) / len(family_estimates) for _ in range(1000)]
+        samples.sort()
+        uncertainty["interval"] = (samples[25], samples[975])
     return ComparisonResult(
         left_label, right_label, len(rows),
         (sum(left_scores) / len(left_scores) - sum(right_scores) / len(right_scores)) if left_scores and right_scores else None,
@@ -119,6 +149,8 @@ def compare_grades(left: Iterable[Grade], right: Iterable[Grade], *, cases: Iter
         limitations=tuple(limitations),
         duplicate_case_ids=duplicate_case_ids,
         scored_pairs=scored_pairs,
+        condition_mismatch_case_ids=tuple(sorted(mismatches)),
+        uncertainty=uncertainty,
     )
 
 

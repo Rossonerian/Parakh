@@ -33,7 +33,7 @@ def test_exact_json_is_strict_about_types_large_integers_and_non_json_constants(
     assert grade_exact_json(json.dumps(huge), huge, attempt_id="huge").passed is True
     assert grade_exact_json(json.dumps(huge - 1), huge, attempt_id="huge-wrong").passed is False
     malformed = grade_exact_json("{\"value\": NaN}", {"value": None}, attempt_id="nan")
-    assert malformed.passed is None and "valid JSON" in (malformed.failure_reason or "")
+    assert malformed.passed is False and malformed.score == 0 and "valid JSON" in (malformed.failure_reason or "")
 
 
 def test_failed_attempt_grade_retains_case_model_and_attempt_conditions():

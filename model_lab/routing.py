@@ -44,23 +44,23 @@ def draft_recommendations(comparison: ComparisonResult, *, cases: Iterable[Case]
         if comparison.scored_pairs < comparison.matched_cases:
             limitations.append("Paired score coverage is incomplete; unknown grades cannot support promotion.")
             eligible = False
-        if critical_failures is None:
+        if comparison.matched_cases != len(case_list) or comparison.scored_pairs != len(case_list):
+            limitations.append("Requested case coverage is incomplete; unmatched or unknown cases block promotion.")
+            eligible = False
+        if not critical_failures or critical_failures.get(model) is not True:
             limitations.append("Critical-failure assessment is unavailable; recommendation is ineligible.")
             eligible = False
-        elif any(value is not True for value in critical_failures.values()):
-            limitations.append("Critical-failure evidence is unknown or blocking; recommendation is ineligible.")
-            eligible = False
-        if condition_eligibility is None:
+        if not condition_eligibility or condition_eligibility.get(model) is not True:
             limitations.append("Task-condition eligibility evidence is unavailable; recommendation is ineligible.")
             eligible = False
-        elif any(value is not True for value in condition_eligibility.values()):
-            limitations.append("Task-condition evidence is unknown or unsupported; recommendation is ineligible.")
+        if minimum_quality is None or not isinstance(minimum_quality, (int, float)) or isinstance(minimum_quality, bool) or minimum_quality <= 0:
+            limitations.append("Minimum quality threshold is missing or invalid; recommendation is ineligible.")
             eligible = False
-        if minimum_quality is not None and score < minimum_quality:
+        elif score < minimum_quality:
             limitations.append("Observed quality is below the configured minimum; recommendation is ineligible.")
             eligible = False
         output.append({"recommendation_id": f"recommendation-{stable_hash({'evidence': evidence_id})[:24]}", "evidence_ids": [evidence_id],
-                       "task_condition": {"domains": sorted({case.domain for case in case_list}), "complexity_levels": sorted({case.complexity_level for case in case_list}),
+                       "task_condition": {"domains": sorted(comparison.by_domain), "complexity_levels": sorted(comparison.by_complexity),
                                            "splits": sorted({case.split for case in case_list})}, "candidate_model": model,
                        "observed_quality": score, "quality_metric": "mean grade score", "eligibility": eligible,
                        "coverage": {"cases": comparison.matched_cases, "families": len(comparison.family_counts)},
@@ -86,7 +86,10 @@ def check_candidate_eligibility(
                 reasons.append(f"unsupported_modality:{mod}")
         elif mod != "text":
             reasons.append(f"unsupported_modality:{mod}")
-    if required_context and getattr(capabilities, "context_window", None):
-        if capabilities.context_window < required_context:
-            reasons.append(f"insufficient_context_window:{capabilities.context_window}<{required_context}")
+    if required_context is not None:
+        window = getattr(capabilities, "context_window", None)
+        if not isinstance(window, int) or isinstance(window, bool) or window <= 0:
+            reasons.append("unknown_context_window")
+        elif window < required_context:
+            reasons.append(f"insufficient_context_window:{window}<{required_context}")
     return (len(reasons) == 0, reasons)

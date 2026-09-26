@@ -41,7 +41,7 @@ def test_exact_and_normalized_grades_record_provenance_and_fail_wrong_answer():
     assert exact.passed is True and exact.score == 1
     assert normalized.passed is True
     assert wrong.passed is False and wrong.score == 0
-    assert exact.evidence["inputs_used"] == ["candidate_output", "reference_answer"]
+    assert list(exact.evidence["inputs_used"]) == ["candidate_output", "reference_answer"]
     assert exact.grader_id == "exact_text"
 
 
@@ -53,7 +53,7 @@ def test_json_schema_arithmetic_and_required_field_graders_are_safe():
 
     assert json_grade.passed and schema_grade.passed and arithmetic_grade.passed and fields_grade.passed
     assert not grade_arithmetic("Total = 12 + 8 = 21", 20, attempt_id="bad").passed
-    assert grade_exact_json("not json", {}, attempt_id="bad-json").passed is None
+    assert grade_exact_json("not json", {}, attempt_id="bad-json").passed is False
     assert grade_required_fields("{}", ["name"], attempt_id="missing").passed is False
 
 

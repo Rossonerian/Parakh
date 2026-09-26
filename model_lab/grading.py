@@ -99,7 +99,7 @@ def _json_equal(left: Any, right: Any, tolerance: float = 0.0) -> bool:
 def grade_exact_json(candidate: Any, reference: Any, *, attempt_id: str, numeric_tolerance: float = 0.0) -> Grade:
     parsed, error = _json_load(candidate)
     if error:
-        return _abstain("exact_json", attempt_id, "candidate output is not valid JSON", parse_error=error)
+        return _grade("exact_json", "exact_json", False, 0.0, "candidate output is not valid JSON", {"parse_error": error}, attempt_id)
     expected, error = _json_load(reference)
     if error:
         return _abstain("exact_json", attempt_id, "reference answer is not valid JSON", reference_parse_error=error)
@@ -201,4 +201,8 @@ def grade_attempt(case: Case, attempt: Attempt) -> Grade:
         grade = _abstain("rubric", attempt.attempt_id, "semantic rubric requires blind human review or calibrated judge", model=model)
     else:
         grade = _abstain("unsupported_method", attempt.attempt_id, f"evaluation method {method} is not deterministic", model=model)
-    return Grade(**{**grade.__dict__, "evidence": {**grade.evidence, "model": model, "case_id": case.case_id, "evaluation_method": method}})
+    evidence = {**grade.evidence, "model": model, "case_id": case.case_id, "evaluation_method": method,
+                "context_condition": attempt.model_config.context_condition,
+                "parameters": attempt.model_config.parameters, "prompt_hash": attempt.prompt_hash,
+                "critical_assessment": "unassessed"}
+    return Grade(**{**grade.__dict__, "evidence": evidence})
