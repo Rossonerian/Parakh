@@ -135,3 +135,10 @@ def test_direct_attempt_normalizes_model_and_latency():
     row = report["rows"][0]
     assert row["model"] == "m" and row["latency_ms"] == 12 and row["context_condition"] == "long"
 
+
+
+def test_csv_header_cells_derived_from_row_keys_are_formula_escaped():
+    report = build_report([{"attempt_id": "a-1", "=HYPERLINK(1)": "x", "+SUM(1)": "x", "-MIN(1)": "x", "@REF": "x"}])
+    header = render_csv(report).splitlines()[0].split(",")
+    assert "attempt_id" in header
+    assert not [cell for cell in header if cell.startswith(("=", "+", "-", "@"))]

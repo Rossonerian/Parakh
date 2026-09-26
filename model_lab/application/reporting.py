@@ -15,7 +15,7 @@ import statistics
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
-from model_lab.schemas import canonical_record, to_dict
+from model_lab.schemas import to_dict
 
 REPORT_VERSION = "model_lab.report/v1"
 _FORMULA_PREFIXES = ("=", "+", "-", "@")
@@ -204,7 +204,7 @@ def render_csv(report: Mapping[str, Any]) -> str:
     fields = sorted({str(key) for row in rows for key in row}) if rows else ["attempt_id", "case_id", "score", "status"]
     stream = io.StringIO(newline="")
     writer = csv.DictWriter(stream, fieldnames=fields, extrasaction="ignore", lineterminator="\n")
-    writer.writeheader()
+    writer.writerow({field: _csv_safe(field) for field in fields})
     for row in rows:
         writer.writerow({field: _csv_safe(row.get(field)) for field in fields})
     return stream.getvalue()
@@ -223,7 +223,6 @@ def _markdown_label_escape(value: Any) -> str:
 def render_markdown(report: Mapping[str, Any]) -> str:
     summary = report.get("summary", {})
     quality = summary.get("quality", {})
-    coverage = summary.get("coverage", {})
     cost_per_vs = summary.get("cost_per_verified_success")
     mean_score = quality.get("mean_score")
 
@@ -455,7 +454,3 @@ def write_report_bundle(records: Iterable[Any] | Mapping[str, Any], output_dir: 
     paths["charts"] = destination / "charts.json"
     paths["charts"].write_text(json.dumps(charts, sort_keys=True, indent=2) + "\n", encoding="utf-8")
     return paths
-
-
-generate_report = build_report
-write_reports = write_report_bundle
