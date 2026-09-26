@@ -59,3 +59,57 @@ def test_promptfoo_run_cli_surface(tmp_path: Path):
     # promptfoo run with --allow-paid but without approved runner must also be rejected
     assert main(["promptfoo", "run", "--manifest", str(manifest_path), "--allow-paid"]) == 2
 
+
+def test_review_cli_surface(tmp_path: Path, capsys):
+    demo_dir = tmp_path / "demo"
+    run_offline_demo(ROOT / "benchmarks/seed_cases.jsonl", demo_dir, seed=41)
+    db_path = str(demo_dir / "model_lab.sqlite3")
+    suite_path = str(ROOT / "benchmarks/seed_cases.jsonl")
+
+    export_path = tmp_path / "reviews.jsonl"
+    capsys.readouterr()
+    assert main(["review", "export", "--db", db_path, "--run", "run-synthetic-good", "--out", str(export_path)]) == 0
+    exported_out = json.loads(capsys.readouterr().out)
+    exported_lines = [json.loads(line) for line in export_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert len(exported_lines) == 60
+    assert exported_out["exported"] == len(exported_lines)
+
+    completed = [dict(row, decision="accept", reviewer_pseudonym="rev-01") for row in exported_lines]
+    import_path = tmp_path / "reviews_completed.jsonl"
+    import_path.write_text("\n".join(json.dumps(row) for row in completed), encoding="utf-8")
+    assert main(["review", "import", "--db", db_path, "--run", "run-synthetic-good", "--in", str(import_path)]) == 0
+    imported_out = json.loads(capsys.readouterr().out)
+    assert imported_out["imported"] == len(exported_lines)
+
+    from model_lab.storage import SQLiteStore
+    store = SQLiteStore(db_path)
+    try:
+        initial_reviews = store.count("reviews", "run-synthetic-good")
+        assert initial_reviews == len(exported_lines)
+    finally:
+        store.close()
+
+    tampered = [dict(completed[0], blind_label="candidate-tampered")] + completed[1:]
+    tampered_path = tmp_path / "reviews_tampered.jsonl"
+    tampered_path.write_text("\n".join(json.dumps(row) for row in tampered), encoding="utf-8")
+    assert main(["review", "import", "--db", db_path, "--run", "run-synthetic-good", "--in", str(tampered_path)]) != 0
+
+    store = SQLiteStore(db_path)
+    try:
+        assert store.count("reviews", "run-synthetic-good") == initial_reviews
+    finally:
+        store.close()
+
+    prompt_export_path = tmp_path / "reviews_prompt.jsonl"
+    assert main(["review", "export", "--db", db_path, "--run", "run-synthetic-good", "--out", str(prompt_export_path), "--include-prompt"]) != 0
+
+    assert main(["review", "export", "--db", db_path, "--run", "run-synthetic-good", "--out", str(prompt_export_path), "--include-prompt", "--suite", suite_path]) == 0
+    prompt_rows = [json.loads(line) for line in prompt_export_path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    assert len(prompt_rows) == len(exported_lines)
+    for row in prompt_rows:
+        assert isinstance(row.get("prompt"), list)
+        assert len(row["prompt"]) > 0
+        serialized = json.dumps(row).lower()
+        assert "synthetic-good" not in serialized
+        assert "fake" not in serialized
+

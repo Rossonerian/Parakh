@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-from dataclasses import replace
 import json
 from pathlib import Path
 import sys
@@ -11,7 +10,7 @@ import sys
 from model_lab.benchmark import export_candidate_jsonl, load_suite, validate_suite
 from model_lab.analysis import compare_grades
 from model_lab.constraints import evaluate_constraints, file_sha256, load_constraint_map
-from model_lab.errors import IntegrityError, ModelLabError
+from model_lab.errors import IntegrityError, ModelLabError, ValidationError
 from model_lab.grading import grade_attempt
 from model_lab.ingestion import ingest_file
 from model_lab.operator_input import build_immutable_plan, load_operator_input, validate_operator_input, write_immutable_plan
@@ -28,7 +27,7 @@ from model_lab.pilot import (
 )
 from model_lab.promptfoo import export_promptfoo_manifest, import_promptfoo_fixture
 from model_lab.reporting import write_report_bundle
-from model_lab.review import export_blind_review, import_blind_reviews
+from model_lab.review import export_blind_review, import_blind_reviews, review_bindings
 from model_lab.schemas import Budget, ModelConfig, Run, utc_now
 from model_lab.storage import SQLiteStore
 
@@ -151,6 +150,7 @@ def build_parser() -> argparse.ArgumentParser:
     review_export.add_argument("--run", required=True, dest="run_id")
     review_export.add_argument("--out", required=True)
     review_export.add_argument("--include-prompt", action="store_true")
+    review_export.add_argument("--suite", help="path to benchmark suite file")
     review_import = review_sub.add_parser("import")
     review_import.add_argument("--db", required=True)
     review_import.add_argument("--run", required=True, dest="run_id")
@@ -341,13 +341,21 @@ def main(argv: list[str] | None = None) -> int:
             store = SQLiteStore(args.db)
             try:
                 if args.review_command == "export":
-                    records = export_blind_review(store.list_attempts(args.run_id), include_prompt=args.include_prompt)
+                    cases = ()
+                    if args.include_prompt:
+                        if not args.suite:
+                            raise ValidationError("review export with --include-prompt requires --suite")
+                        cases = load_suite(args.suite).cases
+                    elif args.suite:
+                        cases = load_suite(args.suite).cases
+                    records = export_blind_review(store.list_attempts(args.run_id), include_prompt=args.include_prompt, cases=cases)
                     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
                     Path(args.out).write_text("".join(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n" for record in records), encoding="utf-8")
                     _print_json({"exported": len(records), "path": args.out, "blind": True})
                 else:
                     records = [json.loads(line) for line in Path(args.input_path).read_text(encoding="utf-8").splitlines() if line.strip()]
-                    reviews = [replace(review, run_id=args.run_id) for review in import_blind_reviews(records)]
+                    bindings = review_bindings(store.list_attempts(args.run_id))
+                    reviews = import_blind_reviews(records, expected_labels=bindings)
                     for review in reviews:
                         store.add_review(review)
                     _print_json({"imported": len(reviews), "run_id": args.run_id, "blind": True})
