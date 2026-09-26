@@ -41,6 +41,42 @@ def test_reconciliation_preserves_unknowns_and_flags_duplicates():
     assert report["duplicate_provider_attempt_ids"] == ["attempt-1"]
 
 
+def test_reconciliation_mixed_currency_returns_none_observed():
+    suite = load_suite(ROOT / "benchmarks/seed_cases.jsonl")
+    attempts = [
+        _attempt(suite.cases[0].case_id, "attempt-1", cost=1200),
+        _attempt(suite.cases[1].case_id, "attempt-2", cost=500),
+    ]
+    records = [
+        {"attempt_id": "attempt-1", "cost_minor": 1200, "currency": "USD"},
+        {"attempt_id": "attempt-2", "cost_minor": 500, "currency": "INR"},
+    ]
+    report = reconcile_provider_usage(attempts, records)
+    assert report["provider_cost_minor_observed"] is None
+    assert report["provider_cost_minor"] is None
+    assert report["complete"] is False
+    assert "mixed_currency" in report["unknowns"]
+
+
+def test_reconciliation_missing_currency_returns_none_observed():
+    suite = load_suite(ROOT / "benchmarks/seed_cases.jsonl")
+    attempts = [
+        _attempt(suite.cases[0].case_id, "attempt-1", cost=1200),
+        _attempt(suite.cases[1].case_id, "attempt-2", cost=500),
+    ]
+    records = [
+        {"attempt_id": "attempt-1", "cost_minor": 1200, "currency": "USD"},
+        {"attempt_id": "attempt-2", "cost_minor": 500, "currency": None},
+    ]
+    report = reconcile_provider_usage(attempts, records)
+    assert report["provider_cost_minor_observed"] is None
+    assert report["provider_cost_minor"] is None
+    assert report["complete"] is False
+    assert "missing_currency:attempt-2" in report["unknowns"]
+    assert report["missing_currency_attempt_ids"] == ["attempt-2"]
+
+
+
 def test_critical_failure_report_is_protected_and_observable_only():
     suite = load_suite(ROOT / "benchmarks/seed_cases.jsonl")
     case = next(case for case in suite.cases if case.evaluation.method == "exact_json")

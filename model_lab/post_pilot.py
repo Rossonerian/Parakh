@@ -69,7 +69,7 @@ def reconcile_provider_usage(
     currency = next(iter(currencies)) if len(currencies) == 1 else None
     if len(currencies) > 1:
         currency = None
-    provider_cost_observed = _known_sum(record.get("cost_minor") for record in unique_matched)
+    provider_cost_observed = None if len(currencies) > 1 or missing_currency_ids else _known_sum(record.get("cost_minor") for record in unique_matched)
     incomplete = bool(missing_ids or duplicate_ids or unknown_ids or invalid_ids or missing_currency_ids or len(currencies) > 1)
     provider_cost = None if incomplete else provider_cost_observed
     local_cost = _known_sum(attempt.cost_minor for attempt in attempt_list)
