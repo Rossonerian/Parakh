@@ -4,13 +4,13 @@ import pytest
 from pathlib import Path
 
 from model_lab.storage import SQLiteStore, IntegrityError
-from model_lab.schemas import Budget, utc_now
+from model_lab.schemas import Budget, ModelConfig, Run, utc_now
 from model_lab.budget import BudgetLedger
 
 @pytest.fixture
 def run_db(tmp_path):
     store = SQLiteStore(tmp_path / "model_lab.sqlite3")
-    store.connection.execute("INSERT INTO runs (run_id, suite_version, case_ids_json, model_config_json, seed, budget_json, started_at, status, environment_json, created_record_json) VALUES (?, '1', '[]', '{}', 1, '{}', '2023', 'new', '{}', '{}')", ("run-1",))
+    store.create_run(Run("run-1", "1", ("case-1",), ModelConfig("fake", "model"), 1, Budget(), utc_now()))
     return store, tmp_path / "model_lab.sqlite3"
 
 def test_same_store_concurrent_settlements_2(run_db):
@@ -84,4 +84,3 @@ def test_multiple_connections_concurrent_settlement(run_db):
     
     assert results.count("success") == 1
     assert results.count("NotFoundError") == 9
-
