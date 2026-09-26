@@ -2,7 +2,7 @@ import json
 
 import pytest
 
-from model_lab.isolation import candidate_input
+from model_lab.domain.isolation import candidate_input
 from model_lab.providers import OpenRouterProvider, ProviderConfigurationError, ProviderRequest, ProviderRuntimeError
 from model_lab.benchmark import load_suite
 

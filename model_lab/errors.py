@@ -20,3 +20,7 @@ class NotFoundError(ModelLabError):
 class BudgetExceededError(ModelLabError):
     """A run cannot dispatch because a finite budget is exhausted."""
 
+
+class PilotBlockedError(ModelLabError):
+    """A live pilot cannot dispatch under the current authorization state."""
+

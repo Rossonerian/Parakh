@@ -1,6 +1,8 @@
 import pytest
+from model_lab.domain.isolation import AuthorizedLiveExecution
+from model_lab.errors import PilotBlockedError
+from model_lab.pilot import require_dispatch_authorization
 from model_lab.promptfoo import invoke_promptfoo, PromptfooImportError, export_promptfoo_manifest
-from model_lab.isolation import AuthorizedLiveExecution
 from model_lab.benchmark import load_suite
 
 def dummy_runner(manifest):
@@ -24,7 +26,6 @@ def test_promptfoo_forged_boolean():
         invoke_promptfoo(valid_manifest, capability=True, runner=dummy_runner)
 
 def test_promptfoo_invalid_artifact():
-    from model_lab.pilot import require_dispatch_authorization, PilotBlockedError
     plan = {"immutable": True, "execution": {"concurrency": 2}}
     with pytest.raises(PilotBlockedError):
         require_dispatch_authorization(plan, allow_paid=True)
@@ -35,7 +36,6 @@ def test_promptfoo_valid_capability():
     assert result == "done"
 
 def test_fake_to_live_prevention():
-    from model_lab.pilot import require_dispatch_authorization, PilotBlockedError
     plan = {"immutable": False, "candidates": [{"provider": "fake", "model": "m", "identifier": "fake:m"}]}
     
     with pytest.raises(PilotBlockedError):

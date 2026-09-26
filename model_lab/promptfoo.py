@@ -10,12 +10,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 import hashlib
 import json
-from .isolation import AuthorizedLiveExecution
 from pathlib import Path
 import re
 from typing import Any, Callable, Iterable, Mapping
 
-from .isolation import assert_candidate_safe
+from model_lab.domain.isolation import AuthorizedLiveExecution, assert_candidate_safe
 from .schemas import canonical_record
 
 MANIFEST_TYPE = "model_lab.promptfoo_manifest"

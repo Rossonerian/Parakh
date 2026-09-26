@@ -13,18 +13,17 @@ import hashlib
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
+from model_lab.application.execution import ExecutionEngine
+from model_lab.domain.isolation import AuthorizedLiveExecution
+from model_lab.errors import ModelLabError, PilotBlockedError, ValidationError
+from model_lab.storage import SQLiteStore
 from .benchmark import load_suite, select_cases
-from .errors import ModelLabError, ValidationError
 from .schemas import Budget, ModelConfig, Run, canonical_record, stable_hash, utc_now
 
 
 PILOT_PLAN_VERSION = "0.1.0"
 DEVELOPMENT_SPLIT = "train"
 DEVELOPMENT_CASE_COUNT = 36
-
-
-class PilotBlockedError(ModelLabError):
-    """A live pilot cannot dispatch under the current authorization state."""
 
 
 def _file_sha256(path: str | Path) -> str:
@@ -202,7 +201,7 @@ def verify_immutable_plan(plan: Mapping[str, Any], *, source_manifest_path: str 
 
 def require_dispatch_authorization(plan: Mapping[str, Any], *, allow_paid: bool,
                                    source_manifest_path: str | Path | None = None,
-                                   constraint_map_path: str | Path | None = None) -> "AuthorizedLiveExecution":
+                                   constraint_map_path: str | Path | None = None) -> AuthorizedLiveExecution:
     blockers = validate_pilot_plan(plan)
     if not allow_paid:
         blockers.append("explicit_allow_paid_acknowledgement_required")
@@ -213,7 +212,6 @@ def require_dispatch_authorization(plan: Mapping[str, Any], *, allow_paid: bool,
             raise PilotBlockedError("immutable plan source and constraint paths are required")
         verify_immutable_plan(plan, source_manifest_path=source_manifest_path, constraint_map_path=constraint_map_path)
 
-    from .isolation import AuthorizedLiveExecution
     return AuthorizedLiveExecution(plan.get("plan_hash") or "unknown")
 
 
@@ -273,7 +271,7 @@ def run_authorized_immutable_pilot(plan: Mapping[str, Any], *, suite_path: str |
     """
     if plan.get("immutable") is not True:
         raise PilotBlockedError("paid pilot execution requires an immutable operator plan")
-    capability = require_dispatch_authorization(plan, allow_paid=True, source_manifest_path=source_manifest_path, constraint_map_path=constraint_map_path)
+    require_dispatch_authorization(plan, allow_paid=True, source_manifest_path=source_manifest_path, constraint_map_path=constraint_map_path)
     execution = plan["execution"]
     if execution["concurrency"] != 1:
         raise PilotBlockedError("live pilot runner currently supports concurrency=1 only")
@@ -285,9 +283,6 @@ def run_authorized_immutable_pilot(plan: Mapping[str, Any], *, suite_path: str |
     case_ids = tuple(plan["case_ids"])
     if len(case_ids) != DEVELOPMENT_CASE_COUNT or any(case.split != DEVELOPMENT_SPLIT for case in select_cases(suite, case_ids=case_ids)):
         raise PilotBlockedError("frozen plan contains non-train cases")
-
-    from .execution import ExecutionEngine
-    from .storage import SQLiteStore
 
     destination = Path(output_dir)
     # Verify every provider configuration before persisting a run or issuing a

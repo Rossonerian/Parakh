@@ -4,8 +4,8 @@ from pathlib import Path
 import pytest
 
 from model_lab.cli import main
+from model_lab.errors import PilotBlockedError
 from model_lab.pilot import (
-    PilotBlockedError,
     build_pilot_plan,
     parse_candidate_spec,
     require_dispatch_authorization,

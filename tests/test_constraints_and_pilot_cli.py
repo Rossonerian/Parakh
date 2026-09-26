@@ -7,7 +7,8 @@ import pytest
 from model_lab.cli import main
 from model_lab.constraints import evaluate_constraints, file_sha256, load_constraint_map
 from model_lab.operator_input import build_immutable_plan, load_operator_input
-from model_lab.pilot import PilotBlockedError, dispatch_preview, require_dispatch_authorization
+from model_lab.errors import PilotBlockedError
+from model_lab.pilot import dispatch_preview, require_dispatch_authorization
 from tests.test_operator_input import complete_input
 
 

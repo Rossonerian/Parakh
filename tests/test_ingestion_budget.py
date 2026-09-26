@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from model_lab.benchmark import load_suite
-from model_lab.budget import BudgetLedger
+from model_lab.domain.budget import BudgetLedger
 from model_lab.errors import BudgetExceededError
 from model_lab.ingestion import ingest_file, ingest_records
 from model_lab.schemas import Budget, ModelConfig, Run

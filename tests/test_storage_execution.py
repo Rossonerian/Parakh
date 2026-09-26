@@ -5,7 +5,7 @@ import pytest
 
 from model_lab.benchmark import load_suite
 from model_lab.errors import BudgetExceededError, IntegrityError
-from model_lab.execution import ExecutionEngine
+from model_lab.application.execution import ExecutionEngine
 from model_lab.providers import FakeProvider, FakeVariant, OllamaProvider, ProviderConfigurationError
 from model_lab.providers.base import ProviderCapabilities, ProviderRequest, ProviderResponse, ProviderRuntimeError
 from model_lab.schemas import Budget, ModelConfig, Run

@@ -113,3 +113,13 @@ def test_review_cli_surface(tmp_path: Path, capsys):
         assert "synthetic-good" not in serialized
         assert "fake" not in serialized
 
+
+def test_run_cli_surface(tmp_path: Path, capsys):
+    capsys.readouterr()
+    exit_code = main(["run", "--suite", str(ROOT / "benchmarks/seed_cases.jsonl"), "--out", str(tmp_path), "--max-cases", "2"])
+    assert exit_code == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["attempts"] == 2
+    assert payload["synthetic"] is True
+    assert (tmp_path / "model_lab.sqlite3").is_file()
+

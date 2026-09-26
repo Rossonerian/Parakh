@@ -7,6 +7,8 @@ import json
 from pathlib import Path
 import sys
 
+from model_lab.application.execution import ExecutionEngine
+from model_lab.application.reporting import write_report_bundle
 from model_lab.benchmark import export_candidate_jsonl, load_suite, validate_suite
 from model_lab.analysis import compare_grades
 from model_lab.constraints import evaluate_constraints, file_sha256, load_constraint_map
@@ -16,7 +18,6 @@ from model_lab.ingestion import ingest_file
 from model_lab.operator_input import build_immutable_plan, load_operator_input, validate_operator_input, write_immutable_plan
 from model_lab.pipeline import run_offline_demo
 from model_lab.pilot import (
-    PilotBlockedError,
     build_pilot_plan,
     dispatch_preview,
     parse_candidate_spec,
@@ -26,7 +27,7 @@ from model_lab.pilot import (
     write_plan,
 )
 from model_lab.promptfoo import export_promptfoo_manifest, import_promptfoo_fixture
-from model_lab.reporting import write_report_bundle
+from model_lab.providers.fake import FakeProvider
 from model_lab.review import export_blind_review, import_blind_reviews, review_bindings
 from model_lab.schemas import Budget, ModelConfig, Run, utc_now
 from model_lab.storage import SQLiteStore
@@ -243,8 +244,6 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "run":
             suite = load_suite(args.suite)
-            from .execution import ExecutionEngine
-            from .providers.fake import FakeProvider
             store = SQLiteStore(Path(args.out) / "model_lab.sqlite3")
             try:
                 case_ids = suite.case_ids[:args.max_cases] if args.max_cases else suite.case_ids

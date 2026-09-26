@@ -5,7 +5,7 @@ import pytest
 
 from model_lab.benchmark import load_suite, validate_suite
 from model_lab.errors import ValidationError
-from model_lab.isolation import assert_candidate_safe, candidate_input
+from model_lab.domain.isolation import assert_candidate_safe, candidate_input
 
 
 ROOT = Path(__file__).parents[1]

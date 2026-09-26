@@ -6,7 +6,7 @@ from copy import deepcopy
 from types import MappingProxyType
 from typing import Any
 
-from model_lab.errors import ValidationError
+from model_lab.errors import PilotBlockedError, ValidationError
 from model_lab.schemas import Case
 
 HIDDEN_FIELDS = frozenset({"evaluation", "reference_answer", "rubric", "critical_failures", "split", "family_id", "domain", "tags", "provenance", "fixture_policy", "suite_version"})
@@ -80,7 +80,6 @@ class AuthorizedLiveExecution:
     __slots__ = ("_plan_hash", "_authorized_by")
 
     def __init__(self, plan_hash: str, authorized_by: str = "local_cli_operator"):
-        from model_lab.pilot import PilotBlockedError
         if not isinstance(plan_hash, str) or not plan_hash.isalnum():
             raise PilotBlockedError("capability requires a validated plan hash")
         self._plan_hash = plan_hash

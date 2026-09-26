@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Protocol
 
-from ..isolation import CandidateInput
+from model_lab.domain.isolation import CandidateInput
 
 
 class ProviderError(Exception):

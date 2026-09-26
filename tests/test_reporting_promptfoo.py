@@ -11,7 +11,7 @@ from model_lab.promptfoo import (
     import_promptfoo_fixture,
     invoke_promptfoo,
 )
-from model_lab.reporting import (
+from model_lab.application.reporting import (
     build_report,
     render_csv,
     render_html,
@@ -175,7 +175,7 @@ def test_promptfoo_live_invocation_fails_closed() -> None:
     with pytest.raises(TypeError):
         invoke_promptfoo(manifest)
 
-    from model_lab.isolation import AuthorizedLiveExecution
+    from model_lab.domain.isolation import AuthorizedLiveExecution
     cap = AuthorizedLiveExecution("validhash", "cli")
     with pytest.raises(PromptfooImportError, match="runner"):
         invoke_promptfoo(manifest, capability=cap)
