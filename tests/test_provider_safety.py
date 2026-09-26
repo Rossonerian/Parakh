@@ -57,7 +57,7 @@ def test_openrouter_preserves_usage_and_rejects_malformed_numbers(monkeypatch):
     assert (result.input_tokens, result.output_tokens) == (3, 2)
     assert result.metadata["provider"] == "openrouter"
     assert result.metadata["model"] == "openai/gpt-4.1"
-    assert result.metadata["provider_usage"] == 0.25
+    assert result.metadata["provider_usage"] == response["usage"]
 
     response["usage"]["prompt_tokens"] = -1
     with pytest.raises(ProviderRuntimeError, match="invalid numeric field") as error:
