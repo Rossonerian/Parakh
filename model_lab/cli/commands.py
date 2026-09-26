@@ -11,6 +11,7 @@ from model_lab.application.execution import ExecutionEngine
 from model_lab.application.reporting import write_report_bundle
 from model_lab.benchmark import export_candidate_jsonl, load_suite, validate_suite
 from model_lab.analysis import compare_grades
+from model_lab.application.observability import environment_checks
 from model_lab.constraints import evaluate_constraints, file_sha256, load_constraint_map
 from model_lab.errors import IntegrityError, ModelLabError, ValidationError
 from model_lab.grading import grade_attempt
@@ -56,6 +57,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     doctor = sub.add_parser("doctor", help="check local offline prerequisites")
     doctor.add_argument("--suite", default="benchmarks/seed_cases.jsonl", help="path to benchmark suite file (default: benchmarks/seed_cases.jsonl)")
+
+    tui = sub.add_parser("tui", help="interactive terminal console (requires the 'tui' extra: pip install -e '.[tui]')")
+    tui.add_argument("--data", default="lab-data/tui", help="workspace directory holding model_lab.sqlite3 (default: lab-data/tui)")
+    tui.add_argument("--suite", default="benchmarks/seed_cases.jsonl", help="benchmark suite file (default: benchmarks/seed_cases.jsonl)")
+    tui.add_argument("--demo", action="store_true", help="if the workspace has no runs, start the offline SIMULATED demo on launch")
+    tui.add_argument("--plan", help="optional pilot plan JSON to preflight (read-only; paid dispatch stays CLI-only)")
 
     init = sub.add_parser("init", help="create a local ModelLab workspace")
     init.add_argument("path", default="lab-data", nargs="?", help="workspace directory path (default: lab-data)")
@@ -216,13 +223,15 @@ def main(argv: list[str] | None = None) -> int:
             _print_json(run_offline_demo(args.suite, args.out, seed=args.seed))
             return 0
         if args.command == "doctor":
-            suite_path = Path(args.suite)
-            checks = {"python_3_12_plus": sys.version_info >= (3, 12), "benchmark_present": suite_path.is_file()}
-            if checks["benchmark_present"]:
-                checks["benchmark_cases"] = validate_suite(load_suite(suite_path))["cases"]
-            checks["offline_ready"] = all(value is True for key, value in checks.items() if key != "benchmark_cases") and checks.get("benchmark_cases") == 60
+            checks = environment_checks(args.suite)
             _print_json(checks)
             return 0 if checks["offline_ready"] else 2
+        if args.command == "tui":
+            try:
+                from model_lab.tui import run_tui
+            except ImportError as exc:
+                raise ModelLabError(f"the TUI needs Textual: pip install -e '.[tui]' ({exc})") from exc
+            return run_tui(data_dir=args.data, suite_path=args.suite, demo=args.demo, plan_path=args.plan)
         if args.command == "init":
             destination = Path(args.path)
             destination.mkdir(parents=True, exist_ok=True)

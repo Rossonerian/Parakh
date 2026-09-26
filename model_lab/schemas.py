@@ -458,6 +458,48 @@ class ProvenanceRecord:
         _freeze_fields(self, "metadata")
 
 
+EVENT_TYPE_RE = re.compile(r"^[a-z][a-z_]{1,63}$")
+
+
+@dataclass(frozen=True)
+class RunEvent:
+    """One append-only operational event (run progress, grading, actions).
+
+    Events describe what the lab did; they never carry oracle/reference data or
+    credentials. ``event_id`` is assigned by storage and is None before insert.
+    """
+
+    timestamp: str
+    event_type: str
+    message: str
+    run_id: str | None = None
+    status: str | None = None
+    case_id: str | None = None
+    model: str | None = None
+    provider: str | None = None
+    duration_ms: float | None = None
+    cost_minor: int | None = None
+    currency: str | None = None
+    error: str | None = None
+    artifact: str | None = None
+    event_id: int | None = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.event_type, str) or not EVENT_TYPE_RE.fullmatch(self.event_type):
+            raise ValidationError("event_type must be a lowercase identifier")
+        require_text(self.timestamp, "timestamp")
+        if not isinstance(self.message, str):
+            raise ValidationError("event message must be text")
+        for name in ("run_id", "case_id"):
+            value = getattr(self, name)
+            if value is not None:
+                require_id(value, name)
+        if self.duration_ms is not None and (not _finite(self.duration_ms) or self.duration_ms < 0):
+            raise ValidationError("event duration_ms must be a non-negative number")
+        if self.cost_minor is not None and (isinstance(self.cost_minor, bool) or not isinstance(self.cost_minor, int) or self.cost_minor < 0):
+            raise ValidationError("event cost_minor must be a non-negative integer")
+
+
 def to_dict(value: Any) -> dict[str, Any] | list[Any] | Any:
     return _plain(value)
 

@@ -10,7 +10,7 @@ from threading import RLock
 from typing import Any
 
 from model_lab.errors import IntegrityError, NotFoundError, ValidationError
-from model_lab.schemas import Attempt, Budget, Grade, HumanReview, ProvenanceRecord, Run, canonical_record
+from model_lab.schemas import Attempt, Budget, Grade, HumanReview, ProvenanceRecord, Run, RunEvent, canonical_record
 
 
 def _json(value: Any) -> str:
@@ -36,6 +36,9 @@ class SQLiteStore:
         self.connection.row_factory = sqlite3.Row
         self.connection.execute("PRAGMA foreign_keys = ON")
         self.connection.execute("PRAGMA busy_timeout = 5000")
+        if self.path != ":memory:":
+            # WAL lets a reader (e.g. the TUI) poll while a run is writing without blocking it.
+            self.connection.execute("PRAGMA journal_mode = WAL")
         self._lock = RLock()
         self._create_schema()
 
@@ -82,8 +85,13 @@ class SQLiteStore:
             quarantine_id INTEGER PRIMARY KEY AUTOINCREMENT, source_label TEXT NOT NULL,
             reason TEXT NOT NULL, raw_record_json TEXT NOT NULL, created_at TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS run_events (
+            event_id INTEGER PRIMARY KEY AUTOINCREMENT, run_id TEXT, timestamp TEXT NOT NULL,
+            event_type TEXT NOT NULL, record_json TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS ix_run_events_run ON run_events(run_id, event_id);
         """)
-        for table in ("attempts", "grades", "reviews", "provenance", "quarantines"):
+        for table in ("attempts", "grades", "reviews", "provenance", "quarantines", "run_events"):
             for operation in ("UPDATE", "DELETE"):
                 self.connection.execute(f"CREATE TRIGGER IF NOT EXISTS immutable_{table}_{operation.lower()} BEFORE {operation} ON {table} BEGIN SELECT RAISE(ABORT, 'immutable evidence'); END")
         self.connection.execute("CREATE TRIGGER IF NOT EXISTS immutable_run_record BEFORE UPDATE OF created_record_json, case_ids_json, model_config_json, budget_json, environment_json ON runs BEGIN SELECT RAISE(ABORT, 'immutable run record'); END")
@@ -206,6 +214,40 @@ class SQLiteStore:
     def quarantined(self) -> list[dict[str, Any]]:
         rows = self.connection.execute("SELECT * FROM quarantines ORDER BY quarantine_id").fetchall()
         return [dict(row) for row in rows]
+
+    @synchronized
+    def add_event(self, event: RunEvent) -> int:
+        record = {**json.loads(_json(event)), "event_id": None}
+        cursor = self.connection.execute(
+            "INSERT INTO run_events(run_id, timestamp, event_type, record_json) VALUES (?, ?, ?, ?)",
+            (event.run_id, event.timestamp, event.event_type, json.dumps(record, sort_keys=True)),
+        )
+        return int(cursor.lastrowid)
+
+    @synchronized
+    def list_events(self, *, run_id: str | None = None, after_id: int = 0, limit: int = 500) -> list[RunEvent]:
+        """Newest ``limit`` events with id > ``after_id``, returned oldest first."""
+        where, params = "event_id > ?", [after_id]
+        if run_id is not None:
+            where += " AND run_id = ?"
+            params.append(run_id)
+        rows = self.connection.execute(
+            f"SELECT event_id, record_json FROM run_events WHERE {where} ORDER BY event_id DESC LIMIT ?", (*params, limit),
+        ).fetchall()
+        return [RunEvent(**{**json.loads(row["record_json"]), "event_id": row["event_id"]}) for row in reversed(rows)]
+
+    @synchronized
+    def list_run_ids(self) -> list[str]:
+        """All run IDs, most recently created first."""
+        return [row[0] for row in self.connection.execute("SELECT run_id FROM runs ORDER BY rowid DESC")]
+
+    @synchronized
+    def list_grades(self, run_id: str) -> list[Grade]:
+        rows = self.connection.execute(
+            "SELECT grades.record_json FROM grades JOIN attempts ON attempts.attempt_id = grades.attempt_id WHERE attempts.run_id = ? ORDER BY grades.grade_id",
+            (run_id,),
+        )
+        return [Grade(**json.loads(row[0])) for row in rows]
 
     @synchronized
     def count(self, table: str, run_id: str | None = None) -> int:

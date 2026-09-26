@@ -7,6 +7,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from model_lab.application.events import record_event
 from model_lab.application.execution import ExecutionEngine
 from model_lab.application.reporting import write_report_bundle
 from .analysis import compare_grades
@@ -40,7 +41,10 @@ def _candidate_output(case: Any, *, incorrect: bool = False) -> str:
     return json.dumps(reference, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
-def _run_for_suite(suite: Any, *, run_id: str, model: str, seed: int, budget: Budget) -> Run:
+def _run_for_suite(suite: Any, *, run_id: str, model: str, seed: int, budget: Budget, pacing_delay_seconds: float = 0.0) -> Run:
+    environment = {"mode": "offline_synthetic", "suite_hash": suite.source_hash or "unknown"}
+    if pacing_delay_seconds:
+        environment["pacing_delay_seconds"] = pacing_delay_seconds
     return Run(
         run_id=run_id,
         suite_version=suite.suite_version,
@@ -49,7 +53,7 @@ def _run_for_suite(suite: Any, *, run_id: str, model: str, seed: int, budget: Bu
         seed=seed,
         budget=budget,
         started_at=utc_now(),
-        environment={"mode": "offline_synthetic", "suite_hash": suite.source_hash or "unknown"},
+        environment=environment,
         prompt_hashes={case.case_id: case.prompt_hash for case in suite.cases},
     )
 
@@ -87,27 +91,47 @@ def _digest(rows: list[dict[str, Any]]) -> str:
     return hashlib.sha256(canonical_record(stable).encode("utf-8")).hexdigest()
 
 
-def _execute_model(suite: Any, store: SQLiteStore, *, run_id: str, model: str, seed: int, incorrect: bool) -> tuple[Run, list[Any], list[Any], list[dict[str, Any]]]:
-    outputs = {case.case_id: _candidate_output(case, incorrect=incorrect) for case in suite.cases}
-    provider = FakeProvider(variant=FakeVariant.CORRECT, outputs=outputs, model=model)
-    run = _run_for_suite(suite, run_id=run_id, model=model, seed=seed, budget=Budget(max_cases=len(suite.cases), max_requests=len(suite.cases)))
-    result = ExecutionEngine(store, provider).execute(suite, run)
-    grades = [grade_attempt(suite.get(attempt.case_id), attempt) for attempt in result.attempts]
+def grade_run(suite: Any, store: SQLiteStore, attempts: list[Any]) -> list[Any]:
+    """Grade attempts deterministically, persist grades and record grading events."""
+    if not attempts:
+        return []
+    first = attempts[0]
+    ctx = {"run_id": first.run_id, "model": first.model_config.model, "provider": first.model_config.provider}
+    record_event(store, "grading_started", f"grading {len(attempts)} attempts", **ctx)
+    grades = [grade_attempt(suite.get(attempt.case_id), attempt) for attempt in attempts]
     for grade in grades:
         store.add_grade(grade)
+    passed = sum(grade.passed is True for grade in grades)
+    abstained = sum(grade.passed is None for grade in grades)
+    record_event(store, "grading_finished", f"graded {len(grades)}: {passed} passed, {len(grades) - passed - abstained} failed, {abstained} abstained", status="graded", **ctx)
+    return grades
+
+
+def _execute_model(suite: Any, store: SQLiteStore, *, run_id: str, model: str, seed: int, incorrect: bool, provider_delay_seconds: float = 0.0) -> tuple[Run, list[Any], list[Any], list[dict[str, Any]]]:
+    outputs = {case.case_id: _candidate_output(case, incorrect=incorrect) for case in suite.cases}
+    provider = FakeProvider(variant=FakeVariant.CORRECT, outputs=outputs, model=model, delay_seconds=provider_delay_seconds)
+    run = _run_for_suite(suite, run_id=run_id, model=model, seed=seed, budget=Budget(max_cases=len(suite.cases), max_requests=len(suite.cases)), pacing_delay_seconds=provider_delay_seconds)
+    result = ExecutionEngine(store, provider).execute(suite, run)
+    grades = grade_run(suite, store, list(result.attempts))
     rows = _rows(suite, list(result.attempts), grades)
     return run, list(result.attempts), grades, rows
 
 
-def run_offline_demo(suite_path: str | Path, output_dir: str | Path, *, seed: int = 7) -> dict[str, Any]:
-    """Run two explicitly synthetic 60-case models through every local layer."""
+def run_offline_demo(suite_path: str | Path, output_dir: str | Path, *, seed: int = 7, database: str | Path | None = None,
+                     run_id_prefix: str = "run", provider_delay_seconds: float = 0.0) -> dict[str, Any]:
+    """Run two explicitly synthetic 60-case models through every local layer.
+
+    ``database`` defaults to ``output_dir/model_lab.sqlite3``; the TUI points it at
+    its workspace DB and uses a unique ``run_id_prefix`` so demos accumulate.
+    """
     suite = load_suite(suite_path)
     destination = Path(output_dir)
     destination.mkdir(parents=True, exist_ok=True)
-    store = SQLiteStore(destination / "model_lab.sqlite3")
+    store = SQLiteStore(Path(database) if database is not None else destination / "model_lab.sqlite3")
     try:
-        good_run, good_attempts, good_grades, good_rows = _execute_model(suite, store, run_id="run-synthetic-good", model="synthetic-good", seed=seed, incorrect=False)
-        bad_run, bad_attempts, bad_grades, bad_rows = _execute_model(suite, store, run_id="run-synthetic-incorrect", model="synthetic-incorrect", seed=seed, incorrect=True)
+        record_event(store, "suite_loaded", f"suite {suite.suite_version} loaded: {len(suite.cases)} cases", artifact=str(suite.source_path))
+        good_run, good_attempts, good_grades, good_rows = _execute_model(suite, store, run_id=f"{run_id_prefix}-synthetic-good", model="synthetic-good", seed=seed, incorrect=False, provider_delay_seconds=provider_delay_seconds)
+        bad_run, bad_attempts, bad_grades, bad_rows = _execute_model(suite, store, run_id=f"{run_id_prefix}-synthetic-incorrect", model="synthetic-incorrect", seed=seed, incorrect=True, provider_delay_seconds=provider_delay_seconds)
         comparison = compare_grades(good_grades, bad_grades, cases=suite.cases)
         routing = draft_recommendations(comparison, cases=suite.cases, eligibility={"synthetic-good": True, "synthetic-incorrect": True}, synthetic=True)
         good_report = write_report_bundle(good_rows, destination / "reports" / "synthetic-good", metadata={"run_id": good_run.run_id, "suite_version": suite.suite_version, "synthetic": True, "suite_hash": suite.source_hash})
@@ -142,6 +166,7 @@ def run_offline_demo(suite_path: str | Path, output_dir: str | Path, *, seed: in
             "provenance": {"source": "offline_fake_provider", "provider": "fake", "model_quality_claim": False},
         }
         (destination / "summary.json").write_text(json.dumps(summary, ensure_ascii=False, sort_keys=True, indent=2) + "\n", encoding="utf-8")
+        record_event(store, "demo_finished", "offline synthetic demo finished: reports, comparison and draft routing written", status="completed", artifact=str(destination))
         return summary
     finally:
         store.close()

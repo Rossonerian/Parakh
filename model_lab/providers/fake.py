@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import time
 from dataclasses import dataclass
 from enum import Enum
 
@@ -26,17 +27,22 @@ class FakeProvider:
     fail_times: int = 0
     name: str = "fake"
     model: str = "synthetic-v1"
+    delay_seconds: float = 0.0  # pacing so offline runs are observable; never reported as latency
 
     def __post_init__(self) -> None:
         self.variant = FakeVariant(self.variant)
         if self.fail_times < 0:
             raise ValueError("fail_times must be non-negative")
+        if self.delay_seconds < 0:
+            raise ValueError("delay_seconds must be non-negative")
         self._calls: dict[str, int] = {}
         self.capabilities = ProviderCapabilities(self.name, self.model, supports_streaming=False, supports_tools=False, context_window=32768, pricing_known=False)
 
     def generate(self, request: ProviderRequest) -> ProviderResponse:
         case_id = request.candidate.case_id
         call = self._calls.get(case_id, 0) + 1
+        if self.delay_seconds:
+            time.sleep(self.delay_seconds)
         self._calls[case_id] = call
         if self.variant is FakeVariant.FAILURE or call <= self.fail_times:
             raise ProviderRuntimeError(f"synthetic provider failure for {case_id} (call {call})")

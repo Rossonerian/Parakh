@@ -12,4 +12,4 @@ promptfoo/
 *.db
 .coverage
 htmlcov/
-
+.agent-team/
