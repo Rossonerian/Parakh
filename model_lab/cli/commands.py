@@ -346,8 +346,6 @@ def main(argv: list[str] | None = None) -> int:
                         if not args.suite:
                             raise ValidationError("review export with --include-prompt requires --suite")
                         cases = load_suite(args.suite).cases
-                    elif args.suite:
-                        cases = load_suite(args.suite).cases
                     records = export_blind_review(store.list_attempts(args.run_id), include_prompt=args.include_prompt, cases=cases)
                     Path(args.out).parent.mkdir(parents=True, exist_ok=True)
                     Path(args.out).write_text("".join(json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n" for record in records), encoding="utf-8")
