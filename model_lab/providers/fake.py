@@ -21,7 +21,7 @@ class FakeVariant(str, Enum):
 class FakeProvider:
     """Deterministic provider instrument. It only receives CandidateInput."""
 
-    variant: FakeVariant = FakeVariant.CORRECT
+    variant: FakeVariant | str = FakeVariant.CORRECT  # str coerced in __post_init__
     outputs: dict[str, str] | None = None
     fail_times: int = 0
     name: str = "fake"
