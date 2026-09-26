@@ -1,0 +1,8 @@
+# PR-04 — report integrity and required views
+
+- Base: current `codex/production-readiness` after PR-02 restored candidate. Owner: evaluation worker reassigned, requested Luna/medium, effective unknown. No recursive workers.
+- Exclusive files: `model_lab/application/reporting.py`, new `tests/test_report_integrity.py`, `docs/handoffs/PR-04.md`. Existing report tests read-only; root owns pipeline/CLI.
+- Requirements: Model_Testing_Spec report views, null unknowns, safe output, truthful financial denominators.
+- Deliver: CSV headers and values formula-safe; Markdown hostile labels harmless; normalize Attempt model/latency fields; reject nonfinite metrics. Separate observed cost subtotal from complete total, never add mixed currencies, cost per verified success only when completeness permits and criteria assessed. Latency sample count/median/p90/p95 with instability flags; context and critical/unassessed coverage; model/domain quality SVG view, cost-versus-verified-success and context views with explicit unknown placeholders when absent. No fake eligibility/critical assessment. Include needed summary in HTML/Markdown, no external assets/scripts.
+- Contract: root rows supply currency, context_condition, critical_assessment (string) and metric_kinds. Existing row inputs without these fields remain unknown. Existing public report functions remain compatible.
+- Tests: focused original report tests plus adversarial malicious headers/labels, mixed currency, incomplete cost, direct Attempt input. Record actual commands/outcomes; no network. Signal ready for root to capture durable commit; worker cannot approve own work.

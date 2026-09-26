@@ -11,6 +11,7 @@ import html
 import io
 import json
 import math
+import statistics
 from pathlib import Path
 from typing import Any, Iterable, Mapping
 
@@ -35,7 +36,20 @@ def _records(records: Iterable[Any]) -> list[dict[str, Any]]:
         plain = _plain(record)
         if not isinstance(plain, dict):
             raise TypeError("report records must be mappings or dataclasses")
-        output.append(dict(plain))
+        row = dict(plain)
+        # Normalize immutable Attempt records to the report-row contract.
+        config = row.get("model_config")
+        if isinstance(config, Mapping):
+            row.setdefault("model", config.get("model"))
+            row.setdefault("provider", config.get("provider"))
+            row.setdefault("context_condition", config.get("context_condition"))
+            row.setdefault("parameters", config.get("parameters"))
+        if "latency_ms" not in row:
+            row["latency_ms"] = row.get("completion_latency_ms")
+        for key, value in row.items():
+            if isinstance(value, float) and not math.isfinite(value):
+                raise ValueError(f"nonfinite report metric: {key}")
+        output.append(row)
     return sorted(output, key=lambda row: (str(row.get("attempt_id", "")), str(row.get("case_id", ""))))
 
 
@@ -48,6 +62,26 @@ def _metric(rows: list[dict[str, Any]], field: str) -> dict[str, Any]:
         "min": min(values) if values else None,
         "max": max(values) if values else None,
     }
+
+
+def _latency(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    values = [row["latency_ms"] for row in rows if isinstance(row.get("latency_ms"), (int, float)) and not isinstance(row.get("latency_ms"), bool)]
+    values.sort()
+    def percentile(p: float) -> float | None:
+        if not values: return None
+        return values[min(len(values) - 1, max(0, int(math.ceil(p * len(values))) - 1))]
+    return {"known_count": len(values), "unknown_count": len(rows) - len(values), "median": statistics.median(values) if values else None,
+            "p90": percentile(.90), "p95": percentile(.95), "tail_unstable": len(values) < 10}
+
+
+def _cost(rows: list[dict[str, Any]]) -> dict[str, Any]:
+    known = [row for row in rows if isinstance(row.get("cost_minor"), int) and not isinstance(row.get("cost_minor"), bool)]
+    currencies = {row.get("currency") for row in known if row.get("currency")}
+    complete = len(known) == len(rows) and bool(rows) and len(currencies) == 1
+    return {"observed_subtotal_minor": sum(row["cost_minor"] for row in known) if known else None,
+            "currency": next(iter(currencies)) if len(currencies) == 1 else None,
+            "known_count": len(known), "unknown_count": len(rows) - len(known), "complete": complete,
+            "total_minor": sum(row["cost_minor"] for row in known) if complete else None}
 
 
 def _quality(rows: list[dict[str, Any]]) -> dict[str, Any]:
@@ -81,8 +115,8 @@ def build_report(records: Iterable[Any], *, metadata: Mapping[str, Any] | None =
         "summary": {
             "row_count": len(rows),
             "quality": _quality(rows),
-            "latency_ms": _metric(rows, "latency_ms"),
-            "cost_minor": _metric(rows, "cost_minor"),
+            "latency_ms": _latency(rows),
+            "cost_minor": _cost(rows),
             "coverage": {
                 "rows": len(rows),
                 "cases_known": sum(bool(row.get("case_id")) for row in rows),
@@ -90,6 +124,8 @@ def build_report(records: Iterable[Any], *, metadata: Mapping[str, Any] | None =
                 "quality_known": sum(isinstance(row.get("score"), (int, float)) and not isinstance(row.get("score"), bool) for row in rows),
                 "latency_known": sum(isinstance(row.get("latency_ms"), (int, float)) and not isinstance(row.get("latency_ms"), bool) for row in rows),
                 "cost_known": sum(isinstance(row.get("cost_minor"), (int, float)) and not isinstance(row.get("cost_minor"), bool) for row in rows),
+                "context_condition_known": sum(bool(row.get("context_condition")) for row in rows),
+                "critical_assessed": sum(row.get("critical_assessment") not in (None, "unassessed") for row in rows),
             },
         },
         "by_model": _group_summary(rows, "model"),
@@ -97,12 +133,16 @@ def build_report(records: Iterable[Any], *, metadata: Mapping[str, Any] | None =
         "by_workflow": _group_summary(rows, "workflow"),
         "by_complexity": _group_summary(rows, "complexity_level"),
         "by_split": _group_summary(rows, "split"),
+        "by_context_condition": _group_summary(rows, "context_condition"),
         "limitations": [
             "Unknown measurements are excluded from metric denominators and remain null.",
             "Synthetic or imported rows are not evidence of real-world model quality unless provenance says so.",
         ],
         "rows": rows,
     }
+    verified = [row for row in rows if row.get("score") is not None and row.get("critical_assessment") not in (None, "unassessed")]
+    cost = report["summary"]["cost_minor"]
+    report["summary"]["cost_per_verified_success"] = (cost["total_minor"] / len(verified) if cost.get("complete") and verified else None)
     return report
 
 
@@ -148,9 +188,12 @@ def render_markdown(report: Mapping[str, Any]) -> str:
     for name in ("quality", "latency_ms", "cost_minor"):
         metric = summary.get(name, {})
         lines.append(f"| {name} | {metric.get('known_count', 0)} | {metric.get('unknown_count', 0)} |")
-    lines += ["", "## By model", "", "| Model | Rows | Mean score |", "| --- | ---: | ---: |"]
+    lines += ["", f"- Cost per verified success: `{summary.get('cost_per_verified_success', 'unknown')}`", "", "## By model", "", "| Model | Rows | Mean score |", "| --- | ---: | ---: |"]
     for model, values in report.get("by_model", {}).items():
         lines.append(f"| {model.replace('|', '\\|')} | {values['count']} | {values['quality'].get('mean_score', 'unknown')} |")
+    lines += ["", "## By context condition", "", "| Condition | Rows | Mean score |", "| --- | ---: | ---: |"]
+    for condition, values in report.get("by_context_condition", {}).items():
+        lines.append(f"| {condition.replace('|', '\\|')} | {values['count']} | {values['quality'].get('mean_score', 'unknown')} |")
     lines += ["", "## Provenance", "", "```json", json.dumps(report.get("provenance", {}), sort_keys=True), "```", "", "## Limitations", ""]
     lines.extend(f"- {item}" for item in report.get("limitations", []))
     return "\n".join(lines) + "\n"
