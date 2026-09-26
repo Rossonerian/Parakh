@@ -12,7 +12,7 @@ from model_lab.grading import (
     grade_required_fields,
     grade_schema,
 )
-from model_lab.schemas import Attempt, AttemptStatus, Case, ModelConfig, utc_now
+from model_lab.schemas import Attempt, AttemptStatus, ModelConfig, utc_now
 from model_lab.benchmark import load_suite
 
 

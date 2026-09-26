@@ -1,5 +1,3 @@
-import json
-
 import pytest
 
 from model_lab.domain.isolation import candidate_input

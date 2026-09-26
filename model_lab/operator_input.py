@@ -16,7 +16,7 @@ import hashlib
 import json
 from pathlib import Path
 import re
-from typing import Any, Mapping
+from typing import Any, Mapping, NoReturn
 
 from .benchmark import load_suite, select_cases
 from .errors import ValidationError
@@ -60,7 +60,7 @@ class CandidateInput:
     revision: str | None
 
 
-def _fail(message: str) -> None:
+def _fail(message: str) -> NoReturn:
     raise OperatorInputError(message)
 
 

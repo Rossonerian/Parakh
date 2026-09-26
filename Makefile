@@ -1,6 +1,9 @@
 PYTHON ?= python3
 
-.PHONY: doctor dev test-unit test-integration test-e2e test-smoke test-release demo
+.PHONY: lint doctor dev test-unit test-integration test-e2e test-smoke test-release demo
+
+lint:
+	$(PYTHON) -m ruff check model_lab tests
 
 doctor:
 	$(PYTHON) -m model_lab doctor
@@ -21,7 +24,7 @@ test-e2e:
 test-smoke:
 	$(PYTHON) -m model_lab suite validate benchmarks/seed_cases.jsonl
 
-test-release: doctor test-unit test-integration test-e2e test-smoke
+test-release: lint doctor test-unit test-integration test-e2e test-smoke
 
 demo:
 	$(PYTHON) -m model_lab demo --suite benchmarks/seed_cases.jsonl --out lab-data/demo

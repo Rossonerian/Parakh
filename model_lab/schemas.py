@@ -14,7 +14,7 @@ import hashlib
 import json
 import math
 import re
-from typing import Any, Mapping, Sequence
+from typing import Any, Mapping
 
 from .errors import ValidationError
 

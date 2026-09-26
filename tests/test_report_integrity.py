@@ -1,5 +1,3 @@
-import json
-
 import pytest
 
 from model_lab.application.reporting import build_report, render_csv, render_html, render_markdown

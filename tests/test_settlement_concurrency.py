@@ -1,9 +1,7 @@
 import threading
-import sqlite3
 import pytest
-from pathlib import Path
 
-from model_lab.storage import SQLiteStore, IntegrityError
+from model_lab.storage import SQLiteStore
 from model_lab.schemas import Budget, ModelConfig, Run, utc_now
 from model_lab.domain.budget import BudgetLedger
 

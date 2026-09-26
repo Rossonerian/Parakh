@@ -9,7 +9,7 @@ from typing import Any
 
 from model_lab.application.execution import ExecutionEngine
 from model_lab.application.reporting import write_report_bundle
-from .analysis import ComparisonResult, compare_grades
+from .analysis import compare_grades
 from .benchmark import load_suite
 from .grading import grade_attempt
 from .promptfoo import export_promptfoo_manifest, import_promptfoo_fixture

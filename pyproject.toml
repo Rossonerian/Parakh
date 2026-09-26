@@ -10,7 +10,10 @@ requires-python = ">=3.12"
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0,<9.0"]
+dev = [
+    "pytest>=8.0,<9.0",
+    "ruff>=0.16,<0.17",
+]
 
 [project.scripts]
 model-lab = "model_lab.cli:main"
@@ -21,4 +24,16 @@ include = ["model_lab*"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+
+[tool.ruff]
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["F", "B"]
+
+[tool.pyright]
+pythonVersion = "3.12"
+include = ["model_lab", "tests"]
+venvPath = "."
+venv = ".venv"
 

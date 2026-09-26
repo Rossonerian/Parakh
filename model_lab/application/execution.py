@@ -13,7 +13,7 @@ from model_lab.domain.budget import BudgetLedger
 from model_lab.errors import BudgetExceededError, ValidationError
 from model_lab.domain.isolation import candidate_input
 from model_lab.providers.base import Provider, ProviderRequest, ProviderRuntimeError
-from model_lab.schemas import Attempt, AttemptStatus, Case, Run, Suite, utc_now
+from model_lab.schemas import Attempt, AttemptStatus, Run, Suite, utc_now
 from model_lab.storage.sqlite import SQLiteStore
 
 

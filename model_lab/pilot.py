@@ -15,7 +15,7 @@ from typing import Any, Iterable, Mapping
 
 from model_lab.application.execution import ExecutionEngine
 from model_lab.domain.isolation import AuthorizedLiveExecution
-from model_lab.errors import ModelLabError, PilotBlockedError, ValidationError
+from model_lab.errors import PilotBlockedError, ValidationError
 from model_lab.storage import SQLiteStore
 from .benchmark import load_suite, select_cases
 from .schemas import Budget, ModelConfig, Run, canonical_record, stable_hash, utc_now

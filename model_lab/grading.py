@@ -7,11 +7,9 @@ as factual or human judgement.
 
 from __future__ import annotations
 
-import ast
 import json
 import math
 import re
-from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
 from typing import Any, Iterable, Mapping
 
@@ -92,7 +90,7 @@ def _json_equal(left: Any, right: Any, tolerance: float = 0.0) -> bool:
     if isinstance(left, Mapping) and isinstance(right, Mapping):
         return set(left) == set(right) and all(_json_equal(left[key], right[key], tolerance) for key in left)
     if isinstance(left, (list, tuple)) and isinstance(right, (list, tuple)):
-        return len(left) == len(right) and all(_json_equal(a, b, tolerance) for a, b in zip(left, right))
+        return len(left) == len(right) and all(_json_equal(a, b, tolerance) for a, b in zip(left, right, strict=True))
     return type(left) is type(right) and left == right
 
 

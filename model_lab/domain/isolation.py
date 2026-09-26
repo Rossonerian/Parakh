@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from copy import deepcopy
 from types import MappingProxyType
 from typing import Any
 
