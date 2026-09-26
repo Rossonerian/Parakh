@@ -1,6 +1,6 @@
 PYTHON ?= python3
 
-.PHONY: lint doctor dev test-unit test-integration test-e2e test-smoke test-release demo
+.PHONY: lint doctor dev tui test-unit test-integration test-e2e test-smoke test-release demo
 
 lint:
 	$(PYTHON) -m ruff check model_lab tests
@@ -11,6 +11,9 @@ doctor:
 dev:
 	@mkdir -p lab-data
 	@dev_dir=$$(mktemp -d lab-data/dev.XXXXXX); echo "ModelLab dev output: $$dev_dir"; $(PYTHON) -m model_lab demo --suite benchmarks/seed_cases.jsonl --out "$$dev_dir"
+
+tui:
+	$(PYTHON) -m model_lab tui --data lab-data/tui --demo
 
 test-unit:
 	$(PYTHON) -m pytest -q
