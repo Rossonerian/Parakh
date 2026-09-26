@@ -57,15 +57,24 @@ def reconcile_provider_usage(
             unknown_ids.append(attempt_id)
 
     matched = [record for record in usage if isinstance(record.get("attempt_id"), str) and record.get("attempt_id") in attempt_ids]
+    unique_matched: list[Mapping[str, Any]] = []
+    unique_ids: set[str] = set()
+    for record in matched:
+        if record["attempt_id"] not in unique_ids:
+            unique_ids.add(record["attempt_id"])
+            unique_matched.append(record)
     missing_ids = sorted(attempt_ids - {str(record.get("attempt_id")) for record in matched})
-    currencies = {record.get("currency") for record in matched if record.get("currency") is not None}
+    currencies = {record.get("currency") for record in unique_matched if isinstance(record.get("currency"), str) and record.get("currency")}
+    missing_currency_ids = sorted(str(record.get("attempt_id")) for record in unique_matched if not isinstance(record.get("currency"), str) or not record.get("currency"))
     currency = next(iter(currencies)) if len(currencies) == 1 else None
     if len(currencies) > 1:
         currency = None
-    provider_cost = _known_sum(record.get("cost_minor") for record in matched)
+    provider_cost_observed = _known_sum(record.get("cost_minor") for record in unique_matched)
+    incomplete = bool(missing_ids or duplicate_ids or unknown_ids or invalid_ids or missing_currency_ids or len(currencies) > 1)
+    provider_cost = None if incomplete else provider_cost_observed
     local_cost = _known_sum(attempt.cost_minor for attempt in attempt_list)
-    provider_input_tokens = _known_sum(record.get("input_tokens") for record in matched)
-    provider_output_tokens = _known_sum(record.get("output_tokens") for record in matched)
+    provider_input_tokens = _known_sum(record.get("input_tokens") for record in unique_matched)
+    provider_output_tokens = _known_sum(record.get("output_tokens") for record in unique_matched)
     local_input_tokens = _known_sum(attempt.input_tokens for attempt in attempt_list)
     local_output_tokens = _known_sum(attempt.output_tokens for attempt in attempt_list)
     return {
@@ -77,8 +86,12 @@ def reconcile_provider_usage(
         "unknown_provider_attempt_ids": sorted(set(unknown_ids)),
         "duplicate_provider_attempt_ids": sorted(set(duplicate_ids)),
         "invalid_provider_records": invalid_ids,
+        "missing_currency_attempt_ids": missing_currency_ids,
+        "provider_cost_minor_observed": provider_cost_observed,
         "currency": currency,
         "currency_consistent": len(currencies) <= 1,
+        "complete": not incomplete,
+        "unknowns": sorted(set([f"missing_attempt:{v}" for v in missing_ids] + [f"duplicate_attempt:{v}" for v in duplicate_ids] + [f"unknown_attempt:{v}" for v in unknown_ids] + [f"invalid_record:{v}" for v in invalid_ids] + [f"missing_currency:{v}" for v in missing_currency_ids] + (["mixed_currency"] if len(currencies) > 1 else []))),
         "provider_cost_minor": provider_cost,
         "local_cost_minor": local_cost,
         "cost_delta_minor": provider_cost - local_cost if provider_cost is not None and local_cost is not None and currency else None,
@@ -87,7 +100,7 @@ def reconcile_provider_usage(
         "local_input_tokens": local_input_tokens,
         "local_output_tokens": local_output_tokens,
         "limitations": [
-            "Missing provider records, missing cost, and mixed currencies remain unknown rather than zero.",
+            "Missing, duplicate, unknown, invalid, or cross-currency records prevent complete totals; observed subtotals are retained separately.",
             "This reconciliation does not create or alter billing ledger entries.",
         ],
     }
@@ -125,6 +138,8 @@ def critical_failure_report(
             "complexity_level": case.complexity_level,
             "attempt_id": attempt_id,
             "critical_failure": True,
+            "failure_source": "observable_attempt_or_deterministic_grade",
+            "semantic_assessment": "unassessed",
             "reasons": reasons,
             "grader_ids": sorted({grade.grader_id for grade in failed_grades}),
         })
@@ -133,9 +148,10 @@ def critical_failure_report(
         "attempt_count": len(attempt_by_id),
         "grade_count": len(grade_list),
         "critical_failure_count": len(rows),
+        "semantic_unassessed_count": len(attempt_by_id),
         "rows": rows,
         "protected_oracle_included": False,
-        "limitations": ["Criticality is limited to observable attempt failures and deterministic grade failures; semantic severity requires human review."],
+        "limitations": ["Criticality is limited to observable attempt failures and deterministic grade failures; semantic severity remains unassessed until bound human review is imported."],
     }
 
 
@@ -217,7 +233,7 @@ def consume_holdout_evaluation(
             stream.write("\n")
     except FileExistsError as exc:
         raise ValidationError("holdout evaluation has already been consumed") from exc
-    return {"status": "consumed", "lock_path": str(destination), **record, "frozen_policy_config_hash": stable_hash({"policy_hash": policy_hash, "config_hash": config_hash})}
+    return {"status": "consumed", "lock_path": str(destination), "lock_scope": "single filesystem path on this host; not a distributed or global lock", **record, "frozen_policy_config_hash": stable_hash({"policy_hash": policy_hash, "config_hash": config_hash})}
 
 
 def router_replay_shadow(

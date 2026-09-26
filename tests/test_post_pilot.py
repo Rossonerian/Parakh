@@ -32,7 +32,9 @@ def test_reconciliation_preserves_unknowns_and_flags_duplicates():
     suite = load_suite(ROOT / "benchmarks/seed_cases.jsonl")
     attempts = [_attempt(suite.cases[0].case_id, "attempt-1", cost=10), _attempt(suite.cases[1].case_id, "attempt-2", cost=None)]
     report = reconcile_provider_usage(attempts, [{"attempt_id": "attempt-1", "cost_minor": 12, "currency": "USD"}, {"attempt_id": "attempt-1", "cost_minor": 12, "currency": "USD"}])
-    assert report["provider_cost_minor"] == 24
+    assert report["provider_cost_minor"] is None
+    assert report["provider_cost_minor_observed"] == 12
+    assert report["complete"] is False
     assert report["local_cost_minor"] is None
     assert report["cost_delta_minor"] is None
     assert report["missing_attempt_ids"] == ["attempt-2"]
