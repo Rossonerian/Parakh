@@ -10,18 +10,22 @@ Prepared 2026-09-09 for a WhatsApp-first assistant with four subscriptions and f
 4. Paste Start_Project_Prompt.md into the Boss thread to implement the bounded core release with tests and evidence.
 5. To build the Linux model comparison tool independently, paste Testing_Lab_Prompt.md into a Codex thread with Model_Testing_Spec.md and benchmarks/ available.
 
-## Current architecture
+## ModelLab (implemented)
 
-The ModelLab package now follows a minimal layered structure to clarify ownership without changing the command surface:
+`model_lab/` is a working, offline-first evaluation lab (Python ≥ 3.12, no runtime dependencies; the console needs the `tui` extra). The Daily AI Agent product itself is still specification only.
 
-- `model_lab/cli/` exposes the user-facing CLI entry points and output helpers.
-- `model_lab/application/` owns orchestration of execution and reporting workflows.
-- `model_lab/domain/` owns the business contracts, validation rules, grading, budgets, and candidate isolation semantics.
-- `model_lab/storage/` owns the SQLite persistence and transactional budget logic.
-- `model_lab/providers/` owns the fake and live provider adapters.
-- `model_lab/*.py` files remain as compatibility shims to preserve the current import surface while the package layout becomes explicit.
+```bash
+python -m venv .venv && .venv/bin/pip install -e '.[dev]'   # pytest, ruff, textual
+make PYTHON=.venv/bin/python tui            # interactive console; starts the offline DEMO on an empty workspace
+.venv/bin/python -m model_lab tui --data lab-data/tui       # same, without auto-demo
+make PYTHON=.venv/bin/python demo           # CLI: full 60-case offline workflow into lab-data/demo
+.venv/bin/python -m model_lab --help        # all CLI commands
+make PYTHON=.venv/bin/python test-release   # lint + doctor + unit + integration + e2e + smoke
+```
 
-This keeps the existing behavior stable while making the flow obvious: CLI -> application orchestration -> domain rules -> storage/providers -> evidence/reporting.
+Console navigation: `1`–`9`, `0`, `l` switch tabs (Dashboard, Suites, Cases, Models, Runs, Run detail, Results, Compare, Review, Routing, Events); `d` demo, `f` fake-provider run, `g` grade, `v` validate, `h` doctor, `r` refresh, `q` quit. Run data lives in `lab-data/tui/model_lab.sqlite3` (gitignored). Everything shown comes from that store; demo data is labelled `SIMULATED`, missing measurements show `N/A`/`not measured`, and the console cannot start paid/live calls — those remain `model-lab pilot run … --allow-paid` with a verified immutable plan. See `Model_Testing_Spec.md` → *Interactive console* and `MANUAL_TESTING.md`.
+
+Layout: `cli/` (argparse surface) → `pipeline.py`, `pilot.py` and feature modules → `application/` (execution engine, reporting, event log, observability read model, operator actions) → `domain/` (isolation, budget) → `storage/` (SQLite) and `providers/` (fake, gated live). `tui/` renders the observability read model only. Module map and invariants: `model_lab/CLAUDE.md`.
 
 ## Files
 
@@ -55,4 +59,4 @@ The proposed stack extends the user's reported backend only after repository ver
 
 Every compared model should receive the same 60 seed cases under the same applicable conditions; report skipped/ineligible cases. The set exceeds the requested 50-prompt minimum, but is only an initial benchmark. It contains no actual provider results and no validated long-context or audio measurements. Expand independent held-out families before using rankings for production routing. Imported aggregate reports cannot substitute for controlled per-case evidence.
 
-ModelLab's documented shell commands describe software Codex is being asked to build. They do not exist merely because this package contains their specification. Pricing figures in example commands/configuration are illustrative, not approved spend.
+Commands in `Model_Testing_Spec.md` → *Proposed command surface* are acceptance targets; only those listed by `python -m model_lab --help` exist. Pricing figures in example commands/configuration are illustrative, not approved spend.

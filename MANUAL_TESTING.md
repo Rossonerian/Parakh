@@ -16,6 +16,19 @@ make PYTHON=.venv/bin/python test-release
 
 The implementation has no runtime network dependency. Keep live-provider keys in environment variables only; do not place them in benchmark files, SQLite records, reports, or `Memory.md`.
 
+## Interactive console (TUI)
+
+```bash
+make PYTHON=.venv/bin/python tui                      # workspace lab-data/tui; starts the SIMULATED demo if empty
+.venv/bin/python -m model_lab tui --data /tmp/lab-tui --demo   # disposable workspace
+```
+
+1. **Dashboard (`1`)** while the demo runs: *Active execution* shows a progress bar, `case N/60` and the current operation; *Recent events* scrolls `case started → provider request started → response received → case completed`. When both runs finish, *Runs* shows 2 completed and *Latest run* shows pass rate with `cost not measured`/`latency not measured` (the fake provider reports neither).
+2. **Runs (`5`) → Enter → Run detail (`6`)**: metadata, budget, environment (`mode=offline_synthetic`), 60/60 progress, grading counts and the run's own event trail. **Results (`7`)** breaks the selected run down by domain, complexity and split; **Review (`9`)** lists every case that is failed, abstained or ungraded with the candidate response (never the reference).
+3. **Fake run (`f`)**: choose variant `failure`, 8 cases, 1 retry, pacing 0.1 → watch retries and failures live on the dashboard and in **Events (`l`)**; the run ends `partial`. `x` cancels a console run between cases.
+
+Also: **Compare (`8`)** two runs → matched-case dimensions and **Routing (`0`)** `PROPOSED` drafts with their blocking limitations; **Models (`4`)** → enter a plan path → *Preflight plan* shows the gate is closed (paid dispatch is CLI-only). `q` exits and restores the terminal.
+
 ## Benchmark validation and candidate export
 
 ```bash

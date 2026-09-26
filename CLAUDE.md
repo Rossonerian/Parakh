@@ -31,6 +31,7 @@ Test:       .venv/bin/python -m pytest -q
 Lint:       make PYTHON=.venv/bin/python lint   # ruff, pyflakes+bugbear rules (pyproject.toml)
 Release:    make PYTHON=.venv/bin/python test-release   # lint + doctor + unit + integration + e2e + smoke
 Demo:       make PYTHON=.venv/bin/python demo
+TUI:        make PYTHON=.venv/bin/python tui      # Textual console over lab-data/tui (needs '.[tui]' or '.[dev]')
 Typecheck:  no gate; pyright-lsp plugin gives editor diagnostics (see .claude/settings.json)
 ```
 

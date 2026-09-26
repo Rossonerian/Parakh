@@ -11,6 +11,10 @@ and repo-wide rules; this file is package-local detail only.
 | `pipeline.py` | end-to-end offline demo (`run_offline_demo`) |
 | `application/execution.py` | `ExecutionEngine`: bounded dispatch, retries, attempt persistence, budget settle |
 | `application/reporting.py` | `build_report`, `render_*`, `write_report_bundle` (escaped CSV/MD/HTML) |
+| `application/events.py` | `record_event` → append-only `run_events` (redacted, bounded text) |
+| `application/observability.py` | read model: `load_snapshot`, `summarize_run`, `run_results`, `case_views` (no oracle data) |
+| `application/lab_actions.py` | offline operator actions (demo, fake run, grade, validate, doctor, import, compare, pilot preflight) |
+| `tui/` | Textual console: `app.py` (threads, polling, actions), `views.py` (one widget per tab), `state.py`, `formatting.py` |
 | `domain/isolation.py` | `CandidateInput`, `candidate_input`, `AuthorizedLiveExecution` capability |
 | `domain/budget.py` | `BudgetLedger` reserve/settle over the store |
 | `storage/sqlite.py` | `SQLiteStore`: runs, append-only attempts, reviews, atomic reservations |
@@ -26,7 +30,7 @@ and repo-wide rules; this file is package-local detail only.
 
 ## Dependency direction
 
-`cli` → `pipeline`/`pilot`/feature modules → `application` → `domain` →
+`cli`/`tui` → `application/lab_actions` → `pipeline`/`pilot`/feature modules → `application` → `domain` →
 `storage`/`providers` → `schemas`/`errors`. Lower layers never import upward:
 `schemas`, `errors`, `storage`, `providers`, `domain` must not import `cli`,
 `pipeline`, `pilot` or `application`. `providers/live.py` is imported only
@@ -45,6 +49,8 @@ function-locally in `pilot._provider_for` so offline paths never load it.
 | Blind review import requires exact `expected_labels` bindings | `review.py` | `tests/test_review_integrity.py` |
 | Holdout case set is consumed exactly once (`O_CREAT\|O_EXCL`) | `post_pilot.py` | `tests/test_post_pilot.py` |
 | Router only ever drafts recommendations, never writes them | `routing.py`, `post_pilot.py` | `tests/test_post_pilot.py` |
+| Run events are append-only and credential-redacted before storage | `storage/sqlite.py`, `application/events.py` | `tests/test_observability_events.py` |
+| The TUI has no paid/live dispatch path (preflight uses `allow_paid=False`) | `application/lab_actions.py`, `tui/app.py` | `tests/test_tui_console.py` |
 
 ## Extending
 
