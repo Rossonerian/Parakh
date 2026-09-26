@@ -283,102 +283,6 @@ def render_markdown(report: Mapping[str, Any]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _svg_quality_by_model_domain(report: Mapping[str, Any]) -> str:
-    by_model = report.get("by_model", {})
-    by_domain = report.get("by_domain", {})
-
-    has_domain = any("domain" in r for r in report.get("rows", []))
-    has_model = any("model" in r for r in report.get("rows", []))
-
-    model_scores = {
-        model: values["quality"].get("mean_score")
-        for model, values in by_model.items()
-        if model != "unknown" or has_model
-    }
-    domain_scores = {
-        domain: values["quality"].get("mean_score")
-        for domain, values in by_domain.items()
-        if domain != "unknown" or has_domain
-    }
-
-    known_model = {k: v for k, v in model_scores.items() if v is not None}
-    known_domain = {k: v for k, v in domain_scores.items() if v is not None}
-
-    width, height = 760, 320
-    title = "Quality by model / domain"
-    safe_title = html.escape(title, quote=True)
-
-    if not known_model and not known_domain:
-        return (
-            f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="160" role="img" aria-label="{safe_title}">\n'
-            f'  <text x="20" y="30" font-size="16" font-weight="bold">{safe_title}</text>\n'
-            f'  <rect x="20" y="50" width="720" height="80" fill="#f8f9fa" stroke="#e0e0e0" rx="4"/>\n'
-            f'  <text x="40" y="95" font-size="14" fill="#666">unknown (no data)</text>\n'
-            f'</svg>\n'
-        )
-
-    svg_elements = [
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" role="img" aria-label="{safe_title}">\n',
-        f'  <text x="20" y="30" font-size="16" font-weight="bold">{safe_title}</text>\n',
-        '  <line x1="390" y1="50" x2="390" y2="280" stroke="#eee" stroke-width="2"/>\n',
-    ]
-
-    # Models column
-    svg_elements.append('  <text x="40" y="60" font-size="13" font-weight="bold" fill="#555">By Model</text>\n')
-    if not known_model:
-        svg_elements.append('  <text x="40" y="100" font-size="13" fill="#888">unknown (no data)</text>\n')
-    else:
-        panel_width = 330
-        bar_width = max(1, (panel_width - 20) // max(1, len(model_scores)))
-        max_val = max(known_model.values(), default=1.0) or 1.0
-        svg_elements.append('  <line x1="40" y1="240" x2="370" y2="240" stroke="#bbb"/>\n')
-        for idx, (model, score) in enumerate(sorted(model_scores.items())):
-            x = 40 + idx * bar_width
-            safe_label = html.escape(str(model), quote=True)
-            if score is None:
-                svg_elements.append(
-                    f'  <text x="{x}" y="225" font-size="11" fill="#888">unknown</text>\n'
-                    f'  <text x="{x}" y="255" font-size="11" transform="rotate(30 {x} 255)">{safe_label}</text>\n'
-                )
-            else:
-                bar_h = int(160 * max(0.0, score) / max_val)
-                y = 240 - bar_h
-                svg_elements.append(
-                    f'  <rect x="{x}" y="{y}" width="{max(1, bar_width - 8)}" height="{bar_h}" fill="#3568a8">'
-                    f'<title>{safe_label}: {score:.4g}</title></rect>\n'
-                    f'  <text x="{x}" y="255" font-size="11" transform="rotate(30 {x} 255)">{safe_label}</text>\n'
-                )
-
-    # Domains column
-    svg_elements.append('  <text x="410" y="60" font-size="13" font-weight="bold" fill="#555">By Domain</text>\n')
-    if not known_domain:
-        svg_elements.append('  <text x="410" y="100" font-size="13" fill="#888">unknown (no data)</text>\n')
-    else:
-        panel_width = 330
-        bar_width = max(1, (panel_width - 20) // max(1, len(domain_scores)))
-        max_val = max(known_domain.values(), default=1.0) or 1.0
-        svg_elements.append('  <line x1="410" y1="240" x2="740" y2="240" stroke="#bbb"/>\n')
-        for idx, (domain, score) in enumerate(sorted(domain_scores.items())):
-            x = 410 + idx * bar_width
-            safe_label = html.escape(str(domain), quote=True)
-            if score is None:
-                svg_elements.append(
-                    f'  <text x="{x}" y="225" font-size="11" fill="#888">unknown</text>\n'
-                    f'  <text x="{x}" y="255" font-size="11" transform="rotate(30 {x} 255)">{safe_label}</text>\n'
-                )
-            else:
-                bar_h = int(160 * max(0.0, score) / max_val)
-                y = 240 - bar_h
-                svg_elements.append(
-                    f'  <rect x="{x}" y="{y}" width="{max(1, bar_width - 8)}" height="{bar_h}" fill="#4a7c59">'
-                    f'<title>{safe_label}: {score:.4g}</title></rect>\n'
-                    f'  <text x="{x}" y="255" font-size="11" transform="rotate(30 {x} 255)">{safe_label}</text>\n'
-                )
-
-    svg_elements.append('</svg>\n')
-    return "".join(svg_elements)
-
-
 def _svg_cost_vs_verified_success(summary: Mapping[str, Any]) -> str:
     cost = summary.get("cost_minor", {})
     total = cost.get("total_minor")
@@ -425,57 +329,33 @@ def _svg_cost_vs_verified_success(summary: Mapping[str, Any]) -> str:
     )
 
 
-def _svg_context_condition(report: Mapping[str, Any]) -> str:
-    by_context = report.get("by_context_condition", {})
-    has_context = any("context_condition" in r for r in report.get("rows", []))
-    context_scores = {
-        cond: values["quality"].get("mean_score")
-        for cond, values in by_context.items()
-        if cond != "unknown" or has_context
-    }
-    known_scores = {k: v for k, v in context_scores.items() if v is not None}
-
-    width, height = 760, 260
-    title = "Performance by context condition"
+def _svg_bars(values: Mapping[str, float | None], title: str) -> str:
+    width, height = 760, 400
     safe_title = html.escape(title, quote=True)
-
-    if not known_scores:
+    known_values = [v for v in values.values() if v is not None]
+    if not values or not known_values:
         return (
             f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="160" role="img" aria-label="{safe_title}">\n'
-            f'  <text x="20" y="30" font-size="16" font-weight="bold">{safe_title}</text>\n'
+            f'  <text x="20" y="30" font-size="18" font-weight="bold">{safe_title}</text>\n'
             f'  <rect x="20" y="50" width="720" height="80" fill="#f8f9fa" stroke="#e0e0e0" rx="4"/>\n'
             f'  <text x="40" y="95" font-size="14" fill="#666">unknown (no data)</text>\n'
             f'</svg>\n'
         )
-
-    bar_width = max(1, (width - 100) // max(1, len(context_scores)))
-    max_val = max(known_scores.values(), default=1.0) or 1.0
-
-    svg_elements = [
-        f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" role="img" aria-label="{safe_title}">\n',
-        f'  <text x="20" y="30" font-size="16" font-weight="bold">{safe_title}</text>\n',
-        '  <line x1="50" y1="200" x2="720" y2="200" stroke="#bbb"/>\n',
-    ]
-
-    for idx, (cond, score) in enumerate(sorted(context_scores.items())):
-        x = 50 + idx * bar_width
-        safe_label = html.escape(str(cond), quote=True)
-        if score is None:
-            svg_elements.append(
-                f'  <text x="{x}" y="185" font-size="11" fill="#888">unknown</text>\n'
-                f'  <text x="{x}" y="220" font-size="11" transform="rotate(30 {x} 220)">{safe_label}</text>\n'
-            )
+    max_value = max(known_values, default=1.0) or 1.0
+    bar_width = max(1, (width - 80) // max(1, len(values)))
+    bars = []
+    for index, (label, value) in enumerate(sorted(values.items())):
+        x = 50 + index * bar_width
+        safe_label = html.escape(str(label), quote=True)
+        if value is None:
+            bars.append(f'<text x="{x}" y="315" font-size="11" fill="#888">unknown</text>')
+            bars.append(f'<text x="{x}" y="350" font-size="11" transform="rotate(30 {x} 350)">{safe_label}</text>')
         else:
-            bar_h = int(140 * max(0.0, score) / max_val)
-            y = 200 - bar_h
-            svg_elements.append(
-                f'  <rect x="{x}" y="{y}" width="{max(1, bar_width - 8)}" height="{bar_h}" fill="#5c6ac4">'
-                f'<title>{safe_label}: {score:.4g}</title></rect>\n'
-                f'  <text x="{x}" y="220" font-size="11" transform="rotate(30 {x} 220)">{safe_label}</text>\n'
-            )
-
-    svg_elements.append('</svg>\n')
-    return "".join(svg_elements)
+            bar_height = int(280 * max(0.0, value) / max_value)
+            y = 330 - bar_height
+            bars.append(f'<rect x="{x}" y="{y}" width="{max(1, bar_width - 8)}" height="{bar_height}" fill="#3568a8"><title>{safe_label}: {value:.4g}</title></rect>')
+            bars.append(f'<text x="{x}" y="350" font-size="11" transform="rotate(30 {x} 350)">{safe_label}</text>')
+    return f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" role="img" aria-label="{safe_title}"><text x="20" y="25" font-size="18">{safe_title}</text><line x1="45" y1="330" x2="740" y2="330" stroke="#333"/>{"".join(bars)}</svg>\n'
 
 
 def render_html(report: Mapping[str, Any]) -> str:
@@ -489,16 +369,39 @@ def render_html(report: Mapping[str, Any]) -> str:
         for row in report.get("rows", [])
     )
 
-    svg_quality = _svg_quality_by_model_domain(report)
+    rows = report.get("rows", [])
+    has_model = any("model" in r for r in rows)
+    has_domain = any("domain" in r for r in rows)
+    has_context = any("context_condition" in r for r in rows)
+
+    model_scores = {
+        model: values["quality"].get("mean_score")
+        for model, values in report.get("by_model", {}).items()
+        if model != "unknown" or has_model
+    }
+    domain_scores = {
+        domain: values["quality"].get("mean_score")
+        for domain, values in report.get("by_domain", {}).items()
+        if domain != "unknown" or has_domain
+    }
+    context_scores = {
+        cond: values["quality"].get("mean_score")
+        for cond, values in report.get("by_context_condition", {}).items()
+        if cond != "unknown" or has_context
+    }
+
+    svg_quality_model = _svg_bars(model_scores, "Quality by model")
+    svg_quality_domain = _svg_bars(domain_scores, "Quality by domain")
     svg_cost = _svg_cost_vs_verified_success(summary)
-    svg_context = _svg_context_condition(report)
+    svg_context = _svg_bars(context_scores, "Performance by context condition")
 
     return (
         "<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\"><title>ModelLab report</title>"
         "<style>body{font-family:sans-serif;max-width:1100px;margin:2rem auto;padding:0 1rem}table{border-collapse:collapse;width:100%}th,td{border:1px solid #bbb;padding:.35rem;text-align:left}th{background:#eee}.report-view{margin:2rem 0}</style>"
         f"</head><body><h1>ModelLab report</h1><p>Rows: {esc(summary.get('row_count'))}; mean score: {esc(quality.get('mean_score'))}</p>"
         "<h2>Views</h2>"
-        f"<section class=\"report-view\">{svg_quality}</section>"
+        f"<section class=\"report-view\">{svg_quality_model}</section>"
+        f"<section class=\"report-view\">{svg_quality_domain}</section>"
         f"<section class=\"report-view\">{svg_cost}</section>"
         f"<section class=\"report-view\">{svg_context}</section>"
         "<h2>Attempts</h2><table><thead><tr><th>Attempt</th><th>Case</th><th>Model</th><th>Status</th><th>Score</th><th>Latency (ms)</th><th>Response</th></tr></thead>"
@@ -506,30 +409,6 @@ def render_html(report: Mapping[str, Any]) -> str:
         + "".join(f"<li>{esc(item)}</li>" for item in report.get("limitations", []))
         + "</ul></body></html>\n"
     )
-
-
-def _svg_bars(values: Mapping[str, float], title: str) -> str:
-    width, height = 760, 400
-    safe_title = html.escape(title, quote=True)
-    if not values:
-        return (
-            f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="160" role="img" aria-label="{safe_title}">\n'
-            f'  <text x="20" y="30" font-size="18" font-weight="bold">{safe_title}</text>\n'
-            f'  <rect x="20" y="50" width="720" height="80" fill="#f8f9fa" stroke="#e0e0e0" rx="4"/>\n'
-            f'  <text x="40" y="95" font-size="14" fill="#666">unknown (no data)</text>\n'
-            f'</svg>\n'
-        )
-    max_value = max(values.values(), default=1.0) or 1.0
-    bar_width = max(1, (width - 80) // max(1, len(values)))
-    bars = []
-    for index, (label, value) in enumerate(sorted(values.items())):
-        x = 50 + index * bar_width
-        bar_height = int(280 * max(0.0, value) / max_value)
-        y = 330 - bar_height
-        safe_label = html.escape(str(label), quote=True)
-        bars.append(f'<rect x="{x}" y="{y}" width="{max(1, bar_width - 8)}" height="{bar_height}" fill="#3568a8"><title>{safe_label}: {value:.4g}</title></rect>')
-        bars.append(f'<text x="{x}" y="350" font-size="11" transform="rotate(30 {x} 350)">{safe_label}</text>')
-    return f'<svg xmlns="http://www.w3.org/2000/svg" width="{width}" height="{height}" role="img" aria-label="{safe_title}"><text x="20" y="25" font-size="18">{safe_title}</text><line x1="45" y1="330" x2="740" y2="330" stroke="#333"/>{"".join(bars)}</svg>\n'
 
 
 def _write_optional_png(path: Path, values: Mapping[str, float], title: str) -> bool:
