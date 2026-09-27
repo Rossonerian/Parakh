@@ -85,11 +85,17 @@ def _ddl() -> str:
 class EvidenceStore:
     """Typed-by-kind JSON evidence over an open ``SQLiteStore`` connection."""
 
-    def __init__(self, store: SQLiteStore) -> None:
+    def __init__(self, store: SQLiteStore, *, ensure_schema: bool = True) -> None:
+        """``ensure_schema=False`` is for readers (e.g. console polling): no DDL, so no write lock."""
         self.store = store
         self.connection: sqlite3.Connection = store.connection
-        with store._lock:
-            self.connection.executescript(_ddl())
+        if ensure_schema:
+            with store._lock:
+                self.connection.executescript(_ddl())
+
+    def has_schema(self) -> bool:
+        return self.connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'state_transitions'").fetchone() is not None
 
     @staticmethod
     def _kind(kind: str) -> tuple[str, ...]:

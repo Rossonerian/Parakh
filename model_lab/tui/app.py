@@ -24,21 +24,23 @@ from textual.screen import ModalScreen
 from textual.widgets import Button, DataTable, Footer, Header, Input, Label, RichLog, Select, Static, TabbedContent, TabPane
 
 from model_lab.application import lab_actions
+from model_lab.application import optimization_console as optimization
 from model_lab.application.observability import open_store
 from model_lab.errors import ModelLabError
 from model_lab.providers.fake import FakeVariant
 from model_lab.tui import formatting as fmt
 from model_lab.tui.state import ConsoleState, SuiteCache, build_state
 from model_lab.tui.views import (
-    CasesView, CompareView, DashboardView, ModelsView, ResultsView, ReviewView, RoutingView, RunDetailView, RunsView,
-    SuitesView, event_line,
+    CandidateReviewView, CasesView, CompareView, DashboardView, ModelsView, PolicyView, PreferenceReviewView, ResultsView,
+    ReviewView, RoutingView, RunDetailView, RunsView, SuitesView, event_line,
 )
 
 POLL_SECONDS = 0.5
 TABS = (
     ("1", "dashboard", "Dashboard"), ("2", "suites", "Suites"), ("3", "cases", "Cases"), ("4", "models", "Models"),
     ("5", "runs", "Runs"), ("6", "run", "Run detail"), ("7", "results", "Results"), ("8", "compare", "Compare"),
-    ("9", "review", "Review"), ("0", "routing", "Routing"), ("l", "events", "Events"),
+    ("9", "review", "Review"), ("0", "routing", "Routing"), ("t", "candidates", "Candidates"), ("p", "preferences", "Preferences"),
+    ("o", "policies", "Policies"), ("l", "events", "Events"),
 )
 
 
@@ -168,6 +170,12 @@ class ParakhApp(App[None]):
                 yield ReviewView()
             with TabPane("0 Routing", id="routing"):
                 yield RoutingView()
+            with TabPane("t Candidates", id="candidates"):
+                yield CandidateReviewView()
+            with TabPane("p Preferences", id="preferences"):
+                yield PreferenceReviewView()
+            with TabPane("o Policies", id="policies"):
+                yield PolicyView()
             with TabPane("l Events", id="events"):
                 yield RichLog(id="event-log", max_lines=2000, markup=True, wrap=True)
         yield Footer()
@@ -234,7 +242,8 @@ class ParakhApp(App[None]):
             self.selected_run_id = state.selected_run.run_id  # adopt the default only when nothing valid is selected
         elif state.selected_run is not None and state.selected_run.run_id != self.selected_run_id:
             self._dirty = True  # built for an older selection; the next tick rebuilds for the current one
-        for view_type in (DashboardView, SuitesView, CasesView, ModelsView, RunsView, RunDetailView, ResultsView, CompareView, ReviewView, RoutingView):
+        for view_type in (DashboardView, SuitesView, CasesView, ModelsView, RunsView, RunDetailView, ResultsView, CompareView, ReviewView, RoutingView,
+                          CandidateReviewView, PreferenceReviewView, PolicyView):
             try:
                 self.query_one(view_type).show(state)
             except Exception as exc:  # a rendering bug must not kill the console; surface it
@@ -443,6 +452,49 @@ class ParakhApp(App[None]):
     def _filter_cases(self) -> None:
         if self.state is not None:
             self.query_one(CasesView).show(self.state)
+
+    # ------------------------------------------------------------------ optimization review (operator-only)
+    @on(DataTable.RowHighlighted, "#cand-table")
+    def _show_candidate(self, event: DataTable.RowHighlighted) -> None:
+        if self.state is not None and event.row_key.value:
+            self.query_one(CandidateReviewView).show_item(self.state, str(event.row_key.value))
+
+    @on(DataTable.RowHighlighted, "#pref-table")
+    def _show_pair(self, event: DataTable.RowHighlighted) -> None:
+        if self.state is not None and event.row_key.value:
+            self.query_one(PreferenceReviewView).show_item(self.state, str(event.row_key.value))
+
+    @on(DataTable.RowHighlighted, "#policy-table")
+    def _show_policy(self, event: DataTable.RowHighlighted) -> None:
+        if self.state is not None and event.row_key.value:
+            self.query_one(PolicyView).show_item(self.state, str(event.row_key.value))
+
+    def _operator_fields(self, prefix: str) -> tuple[str, str]:
+        return self.query_one(f"#{prefix}-actor", Input).value, self.query_one(f"#{prefix}-reason", Input).value
+
+    @on(Button.Pressed, "#btn-cand-approve, #btn-cand-reject")
+    def _review_candidate(self, event: Button.Pressed) -> None:
+        candidate_id = self.query_one(CandidateReviewView).selected
+        if candidate_id is None:
+            self.notify("highlight a candidate first", severity="warning")
+            return
+        decision = "approve" if event.button.id == "btn-cand-approve" else "reject"
+        role = self.query_one("#cand-role", Select).value
+        actor, reason = self._operator_fields("cand")
+        self.start_action(f"candidate {decision}", lambda: optimization.review_candidate(
+            self.data_dir, candidate_id, decision, role=role if isinstance(role, str) else None, actor=actor, reason=reason),
+            lambda t: f"{t['entity_id']}: {t['from_state']} -> {t['to_state']} by {t['actor']}")
+
+    @on(Button.Pressed, "#btn-pref-propose, #btn-pref-approve, #btn-pref-reject")
+    def _review_pair(self, event: Button.Pressed) -> None:
+        pair_id = self.query_one(PreferenceReviewView).selected
+        if pair_id is None:
+            self.notify("highlight a preference pair first", severity="warning")
+            return
+        decision = str(event.button.id).removeprefix("btn-pref-")
+        actor, reason = self._operator_fields("pref")
+        self.start_action(f"pair {decision}", lambda: optimization.review_preference(self.data_dir, pair_id, decision, actor=actor, reason=reason),
+                          lambda t: f"{t['entity_id']}: {t['from_state']} -> {t['to_state']} by {t['actor']}")
 
 
 def run_tui(*, data_dir: str | Path, suite_path: str | Path, demo: bool = False, plan_path: str | None = None) -> int:

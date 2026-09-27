@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from typing import Any, Iterable, Sequence
 
 from textual.app import ComposeResult
@@ -9,8 +10,15 @@ from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.widgets import Button, DataTable, Input, Select, Static
 
 from model_lab.application.observability import BreakdownRow
+from model_lab.application.optimization_console import ROLES
 from model_lab.tui import formatting as fmt
 from model_lab.tui.state import ConsoleState
+
+CANDIDATE_STATE_STYLE = {
+    "NEW": "yellow", "NEEDS_REVIEW": "yellow", "DRAFT": "yellow", "VALIDATED": "cyan", "PROPOSED": "cyan", "TRAINED": "cyan",
+    "APPROVED": "green", "VERIFIED": "green", "TRAIN_ONLY": "green", "REGRESSION": "green", "VALIDATION": "green",
+    "HOLDOUT": "green", "ADVERSARIAL": "green", "EXPORTED": "magenta", "REJECTED": "red", "EXCLUDED": "red",
+}
 
 SPARSE_NOTE = ("[dim]Sparse, fixture-level benchmark: category results describe these cases only. "
                "They do not rank models universally.[/]")
@@ -431,3 +439,152 @@ class RoutingView(VerticalScroll):
             warnings.append(f"[b]{fmt.text(rec['candidate_model'])}[/]")
             warnings.extend(f"  • {fmt.text(item)}" for item in rec.get("limitations", []))
         self.query_one("#routing-limits", Panel).update("\n".join(warnings))
+
+
+def _review_controls(prefix: str, buttons: Sequence[tuple[str, str, str]], *, roles: bool = False) -> ComposeResult:
+    with Horizontal(classes="buttons"):
+        yield Input(placeholder="your name (recorded)", id=f"{prefix}-actor")
+        yield Input(placeholder="reason (recorded)", id=f"{prefix}-reason")
+        if roles:
+            yield Select([(role, role) for role in ROLES], prompt="role", id=f"{prefix}-role")
+        for label, button_id, variant in buttons:
+            yield Button(label, id=button_id, variant=variant)  # type: ignore[arg-type]
+
+
+class CandidateReviewView(Vertical):
+    """Quarantined telemetry-derived cases. Operator view: routing metadata, never free text or references."""
+
+    selected: str | None = None
+
+    def compose(self) -> ComposeResult:
+        yield Panel("Telemetry intake", id="cand-intake")
+        yield make_table("cand-table", ("candidate", "state", "novelty", "domain", "tier", "live action", "privacy", "similar"))
+        yield Panel("Candidate (sanitized sketch; no free text)", id="cand-detail")
+        yield from _review_controls("cand", (("Approve into role", "btn-cand-approve", "primary"), ("Reject", "btn-cand-reject", "error")), roles=True)
+
+    def show(self, state: ConsoleState) -> None:
+        opt = state.optimization
+        if opt is None or not opt.imports:
+            self.query_one("#cand-intake", Panel).update(
+                "No telemetry imported. [b]model-lab telemetry import BATCH --db <workspace>/model_lab.sqlite3[/] quarantines "
+                "bad runs and proposes novel cases here; nothing enters the frozen core benchmark.")
+            sync_table(self.query_one("#cand-table", DataTable), [])
+            return
+        ratio = opt.metrics.get("data_efficiency_ratio", {})
+        self.query_one("#cand-intake", Panel).update(
+            "\n".join(f"{fmt.text(i['import_id'])}  batch {fmt.text(i['batch_id'])}  from {fmt.text(i['producer_repo'])}  "
+                      f"accepted {i['accepted']}  quarantined {i['quarantined']}  candidates {i['candidates']}" for i in opt.imports)
+            + f"\ndata efficiency {fmt.pct(ratio.get('value'))} ({ratio.get('approved_candidates', 0)} approved / "
+              f"{ratio.get('imported_runs', 0)} accepted runs; low can simply mean stable production)")
+        rows = [(c.candidate_id, [fmt.text(fmt.truncate(c.candidate_id, 28)), fmt.styled(c.state, CANDIDATE_STATE_STYLE),
+                                  fmt.text(None if c.novelty is None else f"{c.novelty:.2f}"), fmt.text(c.domain), fmt.text(c.tier),
+                                  fmt.text(c.live_action), fmt.text(c.privacy), str(c.similar)]) for c in opt.candidates]
+        sync_table(self.query_one("#cand-table", DataTable), rows)
+        if self.selected:
+            self.show_item(state, self.selected)
+
+    def show_item(self, state: ConsoleState, candidate_id: str) -> None:
+        self.selected = candidate_id
+        row = next((c for c in (state.optimization.candidates if state.optimization else []) if c.candidate_id == candidate_id), None)
+        if row is None:
+            return
+        self.query_one("#cand-detail", Panel).update(
+            f"[b]{fmt.text(row.candidate_id)}[/]  state {fmt.styled(row.state, CANDIDATE_STATE_STYLE)}  "
+            f"duplicate of {fmt.text(row.duplicate_of, 'none')}\n"
+            f"why novel: {fmt.text(', '.join(row.novelty_reasons), 'not novel (failure/correction signal)')}\n"
+            f"outcome {fmt.text(json.dumps(row.outcome, sort_keys=True))}\n"
+            f"failure signature {fmt.text(json.dumps(row.failure_signature))}\n"
+            f"lineage: run {fmt.text(row.source_run_id)} ← import {fmt.text(row.import_id)} ← "
+            f"{fmt.text(row.lineage.get('producer_repo'))} {fmt.text(row.lineage.get('producer_version'))}")
+
+
+class PreferenceReviewView(Vertical):
+    """Correction-derived preference pairs; ambiguous or low-confidence ones wait here for a human decision."""
+
+    selected: str | None = None
+
+    def compose(self) -> ComposeResult:
+        yield Panel("Preference pairs", id="pref-summary")
+        yield make_table("pref-table", ("pair", "state", "category", "confidence", "source run"))
+        yield Panel("Pair (sanitized text only)", id="pref-detail")
+        yield from _review_controls("pref", (("Genuine correction → propose", "btn-pref-propose", "default"),
+                                             ("Approve for training", "btn-pref-approve", "primary"), ("Reject", "btn-pref-reject", "error")))
+
+    def show(self, state: ConsoleState) -> None:
+        pairs = state.optimization.preferences if state.optimization else []
+        waiting = sum(p.state == "NEEDS_REVIEW" for p in pairs)
+        self.query_one("#pref-summary", Panel).update(
+            f"{len(pairs)} pairs · [yellow]{waiting} need a human classification[/] · "
+            f"{sum(p.state == 'APPROVED' for p in pairs)} approved. Intent changes and style edits are never training labels; "
+            "DPO/PEFT stays disabled until readiness criteria and a trainable target exist."
+            if pairs else "No preference pairs. [b]model-lab preferences extract --db …[/] classifies sanitized corrections.")
+        rows = [(p.pair_id, [fmt.text(fmt.truncate(p.pair_id, 26)), fmt.styled(p.state, CANDIDATE_STATE_STYLE), fmt.text(p.category),
+                             fmt.text(None if p.confidence is None else f"{p.confidence:.2f}"), fmt.text(p.source_run_id)]) for p in pairs]
+        sync_table(self.query_one("#pref-table", DataTable), rows)
+        if self.selected:
+            self.show_item(state, self.selected)
+
+    def show_item(self, state: ConsoleState, pair_id: str) -> None:
+        self.selected = pair_id
+        pair = next((p for p in (state.optimization.preferences if state.optimization else []) if p.pair_id == pair_id), None)
+        if pair is None:
+            return
+        self.query_one("#pref-detail", Panel).update(
+            f"[b]{fmt.text(pair.pair_id)}[/]  {fmt.styled(pair.state, CANDIDATE_STATE_STYLE)}  classified {fmt.text(pair.category)} "
+            f"({fmt.text(None if pair.confidence is None else f'{pair.confidence:.2f}')})\n"
+            f"[green]chosen[/]   {fmt.text(pair.chosen)}\n[red]rejected[/] {fmt.text(pair.rejected)}\nreasons {fmt.text(pair.reason)}")
+
+
+class PolicyView(VerticalScroll):
+    """Policy candidates, their verification gates, and flywheel metrics. Promotion/export stay explicit CLI actions."""
+
+    selected: str | None = None
+
+    def compose(self) -> ComposeResult:
+        yield make_table("policy-table", ("candidate", "kind", "state", "verification", "evidence", "bundle"))
+        yield Panel("Verification", id="policy-detail")
+        yield Panel("Compounding metrics (denominators stated; missing data is N/A)", id="policy-metrics")
+
+    def show(self, state: ConsoleState) -> None:
+        opt = state.optimization
+        policies = opt.policies if opt else []
+        rows = []
+        for p in policies:
+            verdict = "not verified" if p.report is None else ("[green]passed[/]" if p.report["passed"] else f"[red]failed {len(p.report['failed'])}[/]")
+            rows.append((p.candidate_id, [fmt.text(fmt.truncate(p.candidate_id, 26)), fmt.text(p.kind), fmt.styled(p.state, CANDIDATE_STATE_STYLE),
+                                          verdict, fmt.styled(p.report["evidence_class"] if p.report else None, fmt.PROVENANCE_STYLE),
+                                          fmt.text(p.bundle, "-")]))
+        sync_table(self.query_one("#policy-table", DataTable), rows)
+        if not policies:
+            self.query_one("#policy-detail", Panel).update("No policy candidates. Train one with [b]model-lab router train[/].")
+        elif self.selected:
+            self.show_item(state, self.selected)
+        metrics = opt.metrics if opt else {}
+        if not metrics:
+            self.query_one("#policy-metrics", Panel).update(fmt.NA)
+            return
+        shadow = metrics.get("shadow_disagreement") or {}
+        recovery = metrics.get("first_shot_recovery") or {}
+        self.query_one("#policy-metrics", Panel).update(
+            f"shadow disagreement  {fmt.text(', '.join(f'{v}: {fmt.pct(s['rate'])} of {s['n']}' for v, s in shadow.items()), 'no shadow evidence yet')}\n"
+            f"critical regression rate  {fmt.pct((metrics.get('critical_regression_rate') or {}).get('value'))}\n"
+            f"propensity support coverage  {fmt.pct((metrics.get('propensity_support_coverage') or {}).get('value'))}\n"
+            f"first-shot success {fmt.pct(recovery.get('first_shot_success_rate'))} · unrecovered failures {fmt.pct(recovery.get('unrecovered_failure_rate'))} · "
+            f"avg recovery attempts {fmt.text(recovery.get('average_recovery_attempts'))}\n"
+            f"cost per successful run {fmt.text(metrics.get('cost_per_successful_run_usd'))} USD · holdout gap {fmt.text(metrics.get('holdout_gap'))}")
+
+    def show_item(self, state: ConsoleState, candidate_id: str) -> None:
+        self.selected = candidate_id
+        policy = next((p for p in (state.optimization.policies if state.optimization else []) if p.candidate_id == candidate_id), None)
+        if policy is None:
+            return
+        if policy.report is None:
+            detail = "Not verified yet: [b]model-lab verify CANDIDATE --db … --benchmark-runs …[/]"
+        else:
+            report = policy.report
+            failed = "\n".join(f"  [red]✘[/] {fmt.text(gate)}: {fmt.text(reason)}" for gate, reason in report["failed"]) or "  [green]all hard gates passed[/]"
+            detail = (f"report {fmt.text(report['report_id'])}  evidence {fmt.styled(report['evidence_class'], fmt.PROVENANCE_STYLE)}\n{failed}\n"
+                      + "\n".join(f"  • {fmt.text(item)}" for item in report["limitations"]))
+        self.query_one("#policy-detail", Panel).update(
+            f"[b]{fmt.text(policy.candidate_id)}[/] ({fmt.text(policy.kind)}) {fmt.styled(policy.state, CANDIDATE_STATE_STYLE)}  "
+            f"parent {fmt.text(policy.parent_id, 'none')}  dataset {fmt.text(policy.dataset_id)}\n{detail}")

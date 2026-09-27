@@ -11,6 +11,7 @@ from model_lab.application.observability import (
     CaseView, RunResults, RunSummary, Snapshot, SuiteSummary, case_views, load_snapshot, open_store, run_results,
     safe_environment_checks, summarize_loaded_suite,
 )
+from model_lab.application.optimization_console import OptimizationSnapshot, load_optimization
 from model_lab.benchmark import load_suite
 from model_lab.errors import ModelLabError
 from model_lab.schemas import RunEvent, Suite
@@ -28,6 +29,7 @@ class ConsoleState:
     routing: list[dict[str, Any]] = field(default_factory=list)
     preflight: dict[str, Any] | None = None
     suite_error: str | None = None
+    optimization: OptimizationSnapshot | None = None
 
 
 class SuiteCache:
@@ -72,7 +74,7 @@ def build_state(data_dir: str | Path, suite_path: str | Path, suites: SuiteCache
     runs = {run.run_id: run for run in snapshot.runs}
     if selected_run_id not in runs:
         selected_run_id = snapshot.active[0].run_id if snapshot.active else (snapshot.runs[0].run_id if snapshot.runs else None)
-    state = ConsoleState(snapshot=snapshot, suite_error=suites.error)
+    state = ConsoleState(snapshot=snapshot, suite_error=suites.error, optimization=load_optimization(data_dir))
     store = open_store(data_dir) if snapshot.db_exists else None
     try:
         attempts_by_case: dict = {}
