@@ -151,7 +151,7 @@ def test_data_efficiency_metrics(tmp_path: Path) -> None:
 
     eff1 = data_efficiency(evidence)
     assert eff1["imported_runs"] == res.accepted
-    assert eff1["candidates"] == res.candidates
+    assert eff1["imported_candidates"] == res.candidates
     assert eff1["approved"] == 0
     assert eff1["ratio"] == 0.0
 
@@ -162,8 +162,8 @@ def test_data_efficiency_metrics(tmp_path: Path) -> None:
 
     eff2 = data_efficiency(evidence)
     assert eff2["approved"] == 2
-    assert eff2["ratio"] == (2 / res.accepted)
-    assert "2 approved out of" in eff2["note"]
+    assert eff2["ratio"] == (2 / res.candidates)
+    assert f"2 approved out of {res.candidates} imported candidates" in eff2["note"]
 
 
 def test_core_benchmark_file_immutability(tmp_path: Path) -> None:

@@ -67,24 +67,23 @@ def list_candidates(
 
 
 def data_efficiency(evidence: EvidenceStore) -> dict[str, Any]:
-    """Compute data efficiency statistics comparing approved candidates to accepted imported runs."""
+    """Compute approved novel candidates / imported telemetry candidates."""
     imports = evidence.list("telemetry_imports")
     imported_runs = sum(imp.get("accepted", 0) for imp in imports)
-    candidates_count = evidence.count("evaluation_candidates")
+    candidates = evidence.list("evaluation_candidates")
+    candidates_count = len(candidates)
 
     current_states = evidence.states("evaluation_candidate")
     approved_states = {"APPROVED", *ALLOWED_ROLES}
-    approved_count = sum(1 for st in current_states.values() if st in approved_states)
+    approved_count = sum(1 for c in candidates if c.get("duplicate_of") is None
+                         and current_states.get(c["candidate_id"]) in approved_states)
 
-    ratio = (approved_count / imported_runs) if imported_runs > 0 else None
-    note = (
-        f"{approved_count} approved out of {imported_runs} accepted imported runs "
-        f"({candidates_count} candidates total)"
-    )
+    ratio = (approved_count / candidates_count) if candidates_count else None
+    note = f"{approved_count} approved out of {candidates_count} imported candidates ({imported_runs} accepted runs)"
 
     return {
         "imported_runs": imported_runs,
-        "candidates": candidates_count,
+        "imported_candidates": candidates_count,
         "approved": approved_count,
         "ratio": ratio,
         "note": note,

@@ -30,3 +30,24 @@ def test_compounding_efficiency_requires_complete_comparable_cost_and_latency(tm
         assert mixed["mean_reward"] == 0.5
     finally:
         store.close()
+
+
+def test_data_efficiency_uses_candidate_count_not_accepted_run_count(tmp_path):
+    store = SQLiteStore(tmp_path / "efficiency.sqlite3")
+    try:
+        evidence = EvidenceStore(store)
+        for i in range(6):
+            evidence.append("telemetry_records", f"run-{i}", {"run_id": f"run-{i}", "status": "accepted"})
+        empty = compounding_metrics(evidence)["data_efficiency_ratio"]
+        assert empty["value"] is None
+        for candidate_id in ("novel-1", "novel-2"):
+            evidence.append("evaluation_candidates", candidate_id, {"candidate_id": candidate_id, "duplicate_of": None})
+            evidence.transition("evaluation_candidate", candidate_id, "NEW", actor="importer", reason="import")
+            evidence.transition("evaluation_candidate", candidate_id, "VALIDATED", actor="importer", reason="validated")
+        evidence.transition("evaluation_candidate", "novel-1", "APPROVED", actor="reviewer", reason="novel")
+        ratio = compounding_metrics(evidence)["data_efficiency_ratio"]
+        assert ratio["value"] == 0.5
+        assert ratio["approved_candidates"] == 1
+        assert ratio["imported_candidates"] == 2
+    finally:
+        store.close()

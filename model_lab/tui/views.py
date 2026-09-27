@@ -475,7 +475,7 @@ class CandidateReviewView(VerticalScroll):
             "\n".join(f"{fmt.text(i['import_id'])}  batch {fmt.text(i['batch_id'])}  from {fmt.text(i['producer_repo'])}  "
                       f"accepted {i['accepted']}  quarantined {i['quarantined']}  candidates {i['candidates']}" for i in opt.imports)
             + f"\ndata efficiency {fmt.pct(ratio.get('value'))} ({ratio.get('approved_candidates', 0)} approved / "
-              f"{ratio.get('imported_runs', 0)} accepted runs; low can simply mean stable production)")
+              f"{ratio.get('imported_candidates', 0)} imported candidates)")
         rows = [(c.candidate_id, [fmt.text(fmt.truncate(c.candidate_id, 28)), fmt.styled(c.state, CANDIDATE_STATE_STYLE),
                                   fmt.text(None if c.novelty is None else f"{c.novelty:.2f}"), fmt.text(c.domain), fmt.text(c.tier),
                                   fmt.text(c.live_action), fmt.text(c.privacy), str(c.similar)]) for c in opt.candidates]

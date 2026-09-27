@@ -30,8 +30,9 @@ def compounding_metrics(evidence: EvidenceStore, *, propensity_floor: float = 0.
     candidate_states = evidence.states("evaluation_candidate")
     reports = evidence.list("verification_reports")
 
-    approved = sum(1 for c in candidates if candidate_states.get(c["candidate_id"]) in ("APPROVED", *CANDIDATE_ROLES))
-    imported_runs = sum(1 for r in evidence.list("telemetry_records") if r["status"] == "accepted")
+    approved = sum(1 for c in candidates if c.get("duplicate_of") is None
+                   and candidate_states.get(c["candidate_id"]) in ("APPROVED", *CANDIDATE_ROLES))
+    imported_candidates = len(candidates)
 
     outcomes = [t.get("final_outcome") or {} for t in trajectories]
     first_shot = [o["first_shot_success"] for o in outcomes if o.get("first_shot_success") is not None]
@@ -83,8 +84,9 @@ def compounding_metrics(evidence: EvidenceStore, *, propensity_floor: float = 0.
     latest = reports[-1] if reports else None
     critical_failed = [r for r in reports if any(g["gate"] in CRITICAL_GATES and not g["passed"] for g in r["hard_gates"])]
     return {
-        "data_efficiency_ratio": {"value": _ratio(approved, imported_runs), "approved_candidates": approved, "imported_runs": imported_runs,
-                                  "note": "approved novel candidates / accepted imported runs; a low value can simply mean stable production"},
+        "data_efficiency_ratio": {"value": _ratio(approved, imported_candidates), "approved_candidates": approved,
+                                  "imported_candidates": imported_candidates,
+                                  "note": "approved novel candidates / imported telemetry candidates; undefined without candidates"},
         "frontier_migration": (latest or {}).get("soft_metrics", {}).get("frontier_migration"),
         "first_shot_recovery": {
             "first_shot_success_rate": _ratio(sum(first_shot), len(first_shot)),

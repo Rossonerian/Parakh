@@ -257,7 +257,8 @@ def test_compounding_metrics_state_denominators(loop):
         metrics = compounding_metrics(EvidenceStore(store))
     finally:
         store.close()
-    assert metrics["data_efficiency_ratio"]["imported_runs"] == 4400
+    assert metrics["data_efficiency_ratio"]["imported_candidates"] == (
+        loop["import"][1]["candidates"] + loop["cycle_import"][1]["candidates"])
     assert metrics["data_efficiency_ratio"]["approved_candidates"] == 0  # nothing is auto-approved
     # four verification reports; only the leaking-harness one failed a critical gate
     assert metrics["critical_regression_rate"] == {"value": 0.25, "reports": 4}
