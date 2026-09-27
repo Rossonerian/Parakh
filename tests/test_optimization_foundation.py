@@ -13,6 +13,7 @@ from model_lab.artifacts import ed25519
 from model_lab.errors import IntegrityError, PilotBlockedError
 from model_lab.storage import SQLiteStore
 from model_lab.storage.evidence import EvidenceStore
+from model_lab.telemetry.importer import import_batch
 from model_lab.telemetry.schema import TelemetryBatchError, parse_batch
 from model_lab.telemetry.synthetic import MODELS, eligible_actions, expected_outcome, generate_batch
 
@@ -165,6 +166,27 @@ def test_published_telemetry_schema_accepts_fixture_and_rejects_missing_propensi
     assert parse_batch(fixture).invalid == ()
     del fixture["runs"][0]["decisions"][0]["selection_probability"]
     assert any("selection_probability" in e for e in schema_check.errors(fixture, schema))
+
+
+def test_real_karmi_export_imports_without_quarantine_and_keeps_shadow_decisions(tmp_path):
+    """Captured from Karmi's own exporter (Kashyep/Karmi parakh-shadow-integration) after its
+    receiver put a signed bundle in SHADOW: live static decisions logged at p=1.0 plus shadow ones."""
+    import json
+
+    schema_check, schema = _contract("telemetry_batch_v1.schema.json")
+    batch = json.loads((ROOT / "contracts/fixtures/karmi_export_telemetry_batch_v1.json").read_text(encoding="utf-8"))
+    assert schema_check.errors(batch, schema) == []
+    parsed = parse_batch(batch)
+    assert parsed.invalid == () and len(parsed.valid) == len(batch["runs"]) == 24
+    assert {r.live_decision.selection_probability for r in parsed.valid} == {1.0}
+    assert all(len(r.shadow_decisions) == 1 for r in parsed.valid)
+    store = SQLiteStore(str(tmp_path / "karmi.db"))
+    try:
+        first, again = import_batch(store, batch), import_batch(store, batch)
+    finally:
+        store.close()
+    assert (first.status, first.accepted, first.quarantined) == ("imported", 24, 0)
+    assert (again.status, again.import_id) == ("duplicate", first.import_id)
 
 
 def test_feature_vectors_are_deterministic_bounded_and_text_free():
