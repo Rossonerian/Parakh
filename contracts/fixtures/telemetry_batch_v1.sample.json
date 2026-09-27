@@ -1,0 +1,1130 @@
+{
+  "batch_id": "synthetic-2026-0",
+  "feature_schema_version": "routing-features.v1",
+  "generated_at": "2026-09-01T23:00:00Z",
+  "model_registry": [
+    {
+      "estimated_input_cost_per_token": 1e-07,
+      "estimated_output_cost_per_token": 4e-07,
+      "max_context_tokens": 32000,
+      "model": "cheap",
+      "model_version": "sim-1",
+      "provider": "sim",
+      "supports_structured_output": true,
+      "supports_tools": false
+    },
+    {
+      "estimated_input_cost_per_token": 8e-07,
+      "estimated_output_cost_per_token": 3.2e-06,
+      "max_context_tokens": 128000,
+      "model": "balanced",
+      "model_version": "sim-1",
+      "provider": "sim",
+      "supports_structured_output": true,
+      "supports_tools": true
+    },
+    {
+      "estimated_input_cost_per_token": 5e-06,
+      "estimated_output_cost_per_token": 2e-05,
+      "max_context_tokens": 200000,
+      "model": "flagship",
+      "model_version": "sim-1",
+      "provider": "sim",
+      "supports_structured_output": true,
+      "supports_tools": true
+    }
+  ],
+  "producer": {
+    "repo": "parakh-synthetic-karmi",
+    "version": "0.1.0"
+  },
+  "runs": [
+    {
+      "attempts": [
+        {
+          "attempt_id": "att-srun-2026-0-00000-0",
+          "currency": "USD",
+          "decision_id": "dec-srun-2026-0-00000",
+          "error_type": null,
+          "estimated_cost": 0.0039504,
+          "input_tokens": 2138,
+          "latency_ms": 1721.1,
+          "model": "balanced",
+          "output_tokens": 700,
+          "provider": "sim",
+          "retry_number": 0,
+          "success": true
+        }
+      ],
+      "completed_at": "2026-09-01T00:00:01.721139Z",
+      "decisions": [
+        {
+          "created_at": "2026-09-01T00:00:00Z",
+          "decision_id": "dec-srun-2026-0-00000",
+          "eligible_models": [
+            "sim/balanced",
+            "sim/flagship"
+          ],
+          "exploration": false,
+          "feature_schema_version": "routing-features.v1",
+          "policy_version": "static-v1",
+          "selected_model": "balanced",
+          "selected_provider": "sim",
+          "selection_probability": 0.85,
+          "shadow": false
+        }
+      ],
+      "feature_schema_version": "routing-features.v1",
+      "feedback": [],
+      "harness_version": "harness-v1",
+      "outcome": {
+        "completed": true,
+        "correction_distance": null,
+        "critical_failure": false,
+        "currency": "USD",
+        "final_cost": 0.0039504,
+        "final_latency_ms": 1721.1,
+        "finalized_at": "2026-09-01T01:00:00Z",
+        "first_shot_success": true,
+        "retry_count": 0,
+        "structured_output_valid": true,
+        "tool_success": true,
+        "user_abandon_signal": false,
+        "user_accept_signal": false,
+        "user_correction_signal": false,
+        "user_retry_signal": false
+      },
+      "policy_version": "static-v1",
+      "prompt_version": "prompt-v1",
+      "request_id": "req-srun-2026-0-00000",
+      "routing_context": {
+        "context_utilization_ratio": 0.0167,
+        "conversation_depth": 3,
+        "estimated_input_tokens": 2138,
+        "latency_slo_ms": 10000,
+        "previous_tool_failure": false,
+        "requires_external_data": false,
+        "requires_memory": true,
+        "requires_structured_output": true,
+        "requires_tools": true,
+        "retry_number": 0,
+        "task_domain": "support",
+        "tier": "trika",
+        "tool_count": 2
+      },
+      "run_id": "srun-2026-0-00000",
+      "session_id_hash": "448045b32881e027a4386ec7",
+      "started_at": "2026-09-01T00:00:00Z",
+      "status": "completed",
+      "task_domain": "support",
+      "tier": "trika",
+      "tool_events": [
+        {
+          "attempt_number": 1,
+          "error_class": null,
+          "event_id": "tool-srun-2026-0-00000-0",
+          "execution_success": true,
+          "latency_ms": 314.0,
+          "schema_valid": true,
+          "tool_name": "tool_0"
+        },
+        {
+          "attempt_number": 1,
+          "error_class": null,
+          "event_id": "tool-srun-2026-0-00000-1",
+          "execution_success": true,
+          "latency_ms": 207.3,
+          "schema_valid": true,
+          "tool_name": "tool_1"
+        }
+      ],
+      "validation_events": [
+        {
+          "error_class": null,
+          "event_id": "val-srun-2026-0-00000",
+          "passed": true,
+          "validator": "structured_output"
+        }
+      ]
+    },
+    {
+      "attempts": [
+        {
+          "attempt_id": "att-srun-2026-0-00001-0",
+          "currency": "USD",
+          "decision_id": "dec-srun-2026-0-00001",
+          "error_type": "task_failure",
+          "estimated_cost": 0.0386272,
+          "input_tokens": 45484,
+          "latency_ms": 2405.2,
+          "model": "balanced",
+          "output_tokens": 700,
+          "provider": "sim",
+          "retry_number": 0,
+          "success": false
+        },
+        {
+          "attempt_id": "att-srun-2026-0-00001-1",
+          "currency": "USD",
+          "decision_id": "dec-srun-2026-0-00001",
+          "error_type": "task_failure",
+          "estimated_cost": 0.0386272,
+          "input_tokens": 45484,
+          "latency_ms": 2405.2,
+          "model": "balanced",
+          "output_tokens": 700,
+          "provider": "sim",
+          "retry_number": 1,
+          "success": false
+        }
+      ],
+      "completed_at": "2026-09-01T00:05:04.810362Z",
+      "decisions": [
+        {
+          "created_at": "2026-09-01T00:05:00Z",
+          "decision_id": "dec-srun-2026-0-00001",
+          "eligible_models": [
+            "sim/balanced",
+            "sim/flagship"
+          ],
+          "exploration": false,
+          "feature_schema_version": "routing-features.v1",
+          "policy_version": "static-v1",
+          "selected_model": "balanced",
+          "selected_provider": "sim",
+          "selection_probability": 0.85,
+          "shadow": false
+        }
+      ],
+      "feature_schema_version": "routing-features.v1",
+      "feedback": [],
+      "harness_version": "harness-v1",
+      "outcome": {
+        "completed": false,
+        "correction_distance": null,
+        "critical_failure": false,
+        "currency": "USD",
+        "final_cost": 0.0772544,
+        "final_latency_ms": 4810.4,
+        "finalized_at": "2026-09-01T01:05:00Z",
+        "first_shot_success": false,
+        "retry_count": 1,
+        "structured_output_valid": false,
+        "tool_success": null,
+        "user_abandon_signal": false,
+        "user_accept_signal": false,
+        "user_correction_signal": false,
+        "user_retry_signal": false
+      },
+      "policy_version": "static-v1",
+      "prompt_version": "prompt-v1",
+      "request_id": "req-srun-2026-0-00001",
+      "routing_context": {
+        "context_utilization_ratio": 0.3553,
+        "conversation_depth": 7,
+        "estimated_input_tokens": 45484,
+        "latency_slo_ms": 4000,
+        "previous_tool_failure": false,
+        "requires_external_data": true,
+        "requires_memory": false,
+        "requires_structured_output": true,
+        "requires_tools": false,
+        "retry_number": 0,
+        "task_domain": "source_reasoning",
+        "tier": "trika",
+        "tool_count": 0
+      },
+      "run_id": "srun-2026-0-00001",
+      "session_id_hash": "391a20989fa6a8604081a635",
+      "started_at": "2026-09-01T00:05:00Z",
+      "status": "failed",
+      "task_domain": "source_reasoning",
+      "tier": "trika",
+      "tool_events": [],
+      "validation_events": [
+        {
+          "error_class": "schema_invalid",
+          "event_id": "val-srun-2026-0-00001",
+          "passed": false,
+          "validator": "structured_output"
+        }
+      ]
+    },
+    {
+      "attempts": [
+        {
+          "attempt_id": "att-srun-2026-0-00002-0",
+          "currency": "USD",
+          "decision_id": "dec-srun-2026-0-00002",
+          "error_type": "task_failure",
+          "estimated_cost": 0.0063192,
+          "input_tokens": 6699,
+          "latency_ms": 1770.8,
+          "model": "balanced",
+          "output_tokens": 300,
+          "provider": "sim",
+          "retry_number": 0,
+          "success": false
+        },
+        {
+          "attempt_id": "att-srun-2026-0-00002-1",
+          "currency": "USD",
+          "decision_id": "dec-srun-2026-0-00002",
+          "error_type": "task_failure",
+          "estimated_cost": 0.0063192,
+          "input_tokens": 6699,
+          "latency_ms": 1770.8,
+          "model": "balanced",
+          "output_tokens": 300,
+          "provider": "sim",
+          "retry_number": 1,
+          "success": false
+        }
+      ],
+      "completed_at": "2026-09-01T00:10:03.541547Z",
+      "decisions": [
+        {
+          "created_at": "2026-09-01T00:10:00Z",
+          "decision_id": "dec-srun-2026-0-00002",
+          "eligible_models": [
+            "sim/cheap",
+            "sim/balanced"
+          ],
+          "exploration": false,
+          "feature_schema_version": "routing-features.v1",
+          "policy_version": "static-v1",
+          "selected_model": "balanced",
+          "selected_provider": "sim",
+          "selection_probability": 0.85,
+          "shadow": false
+        }
+      ],
+      "feature_schema_version": "routing-features.v1",
+      "feedback": [],
+      "harness_version": "harness-v1",
+      "outcome": {
+        "completed": false,
+        "correction_distance": null,
+        "critical_failure": false,
+        "currency": "USD",
+        "final_cost": 0.0126384,
+        "final_latency_ms": 3541.5,
+        "finalized_at": "2026-09-01T01:10:00Z",
+        "first_shot_success": false,
+        "retry_count": 1,
+        "structured_output_valid": null,
+        "tool_success": null,
+        "user_abandon_signal": false,
+        "user_accept_signal": false,
+        "user_correction_signal": false,
+        "user_retry_signal": false
+      },
+      "policy_version": "static-v1",
+      "prompt_version": "prompt-v1",
+      "request_id": "req-srun-2026-0-00002",
+      "routing_context": {
+        "context_utilization_ratio": 0.0523,
+        "conversation_depth": 4,
+        "estimated_input_tokens": 6699,
+        "latency_slo_ms": 10000,
+        "previous_tool_failure": false,
+        "requires_external_data": false,
+        "requires_memory": false,
+        "requires_structured_output": false,
+        "requires_tools": false,
+        "retry_number": 0,
+        "task_domain": "document_extraction",
+        "tier": "yanta",
+        "tool_count": 0
+      },
+      "run_id": "srun-2026-0-00002",
+      "session_id_hash": "448045b32881e027a4386ec7",
+      "started_at": "2026-09-01T00:10:00Z",
+      "status": "failed",
+      "task_domain": "document_extraction",
+      "tier": "yanta",
+      "tool_events": [],
+      "validation_events": []
+    },
+    {
+      "attempts": [
+        {
+          "attempt_id": "att-srun-2026-0-00003-0",
+          "currency": "USD",
+          "decision_id": "dec-srun-2026-0-00003",
+          "error_type": null,
+          "estimated_cost": 0.0897128,
+          "input_tokens": 109341,
+          "latency_ms": 4693.2,
+          "model": "balanced",
+          "output_tokens": 700,
+          "provider": "sim",
+          "retry_number": 0,
+          "success": true
+        }
+      ],
+      "completed_at": "2026-09-01T00:15:04.693241Z",
+      "decisions": [
+        {
+          "created_at": "2026-09-01T00:15:00Z",
+          "decision_id": "dec-srun-2026-0-00003",
+          "eligible_models": [
+            "sim/balanced",
+            "sim/flagship"
+          ],
+          "exploration": false,
+          "feature_schema_version": "routing-features.v1",
+          "policy_version": "static-v1",
+          "selected_model": "balanced",
+          "selected_provider": "sim",
+          "selection_probability": 0.85,
+          "shadow": false
+        }
+      ],
+      "feature_schema_version": "routing-features.v1",
+      "feedback": [],
+      "harness_version": "harness-v1",
+      "outcome": {
+        "completed": true,
+        "correction_distance": null,
+        "critical_failure": false,
+        "currency": "USD",
+        "final_cost": 0.0897128,
+        "final_latency_ms": 4693.2,
+        "finalized_at": "2026-09-01T01:15:00Z",
+        "first_shot_success": true,
+        "retry_count": 0,
+        "structured_output_valid": true,
+        "tool_success": null,
+        "user_abandon_signal": false,
+        "user_accept_signal": false,
+        "user_correction_signal": false,
+        "user_retry_signal": false
+      },
+      "policy_version": "static-v1",
+      "prompt_version": "prompt-v1",
+      "request_id": "req-srun-2026-0-00003",
+      "routing_context": {
+        "context_utilization_ratio": 0.8542,
+        "conversation_depth": 3,
+        "estimated_input_tokens": 109341,
+        "latency_slo_ms": 10000,
+        "previous_tool_failure": false,
+        "requires_external_data": false,
+        "requires_memory": false,
+        "requires_structured_output": true,
+        "requires_tools": false,
+        "retry_number": 0,
+        "task_domain": "expenses",
+        "tier": "part",
+        "tool_count": 0
+      },
+      "run_id": "srun-2026-0-00003",
+      "session_id_hash": "273523413cb4e02e058771cb",
+      "started_at": "2026-09-01T00:15:00Z",
+      "status": "completed",
+      "task_domain": "expenses",
+      "tier": "part",
+      "tool_events": [],
+      "validation_events": [
+        {
+          "error_class": null,
+          "event_id": "val-srun-2026-0-00003",
+          "passed": true,
+          "validator": "structured_output"
+        }
+      ]
+    },
+    {
+      "attempts": [
+        {
+          "attempt_id": "att-srun-2026-0-00004-0",
+          "currency": "USD",
+          "decision_id": "dec-srun-2026-0-00004",
+          "error_type": null,
+          "estimated_cost": 0.0195944,
+          "input_tokens": 23293,
+          "latency_ms": 2459.5,
+          "model": "balanced",
+          "output_tokens": 300,
+          "provider": "sim",
+          "retry_number": 0,
+          "success": true
+        }
+      ],
+      "completed_at": "2026-09-01T00:20:02.459484Z",
+      "decisions": [
+        {
+          "created_at": "2026-09-01T00:20:00Z",
+          "decision_id": "dec-srun-2026-0-00004",
+          "eligible_models": [
+            "sim/cheap",
+            "sim/balanced",
+            "sim/flagship"
+          ],
+          "exploration": false,
+          "feature_schema_version": "routing-features.v1",
+          "policy_version": "static-v1",
+          "selected_model": "balanced",
+          "selected_provider": "sim",
+          "selection_probability": 0.8,
+          "shadow": false
+        }
+      ],
+      "feature_schema_version": "routing-features.v1",
+      "feedback": [],
+      "harness_version": "harness-v1",
+      "outcome": {
+        "completed": true,
+        "correction_distance": null,
+        "critical_failure": false,
+        "currency": "USD",
+        "final_cost": 0.0195944,
+        "final_latency_ms": 2459.5,
+        "finalized_at": "2026-09-01T01:20:00Z",
+        "first_shot_success": true,
+        "retry_count": 0,
+        "structured_output_valid": null,
+        "tool_success": null,
+        "user_abandon_signal": false,
+        "user_accept_signal": false,
+        "user_correction_signal": false,
+        "user_retry_signal": false
+      },
+      "policy_version": "static-v1",
+      "prompt_version": "prompt-v1",
+      "request_id": "req-srun-2026-0-00004",
+      "routing_context": {
+        "context_utilization_ratio": 0.182,
+        "conversation_depth": 2,
+        "estimated_input_tokens": 23293,
+        "latency_slo_ms": 4000,
+        "previous_tool_failure": false,
+        "requires_external_data": false,
+        "requires_memory": false,
+        "requires_structured_output": false,
+        "requires_tools": false,
+        "retry_number": 0,
+        "task_domain": "source_reasoning",
+        "tier": "part",
+        "tool_count": 0
+      },
+      "run_id": "srun-2026-0-00004",
+      "session_id_hash": "c49ea0077cde58f2cfc79b3a",
+      "started_at": "2026-09-01T00:20:00Z",
+      "status": "completed",
+      "task_domain": "source_reasoning",
+      "tier": "part",
+      "tool_events": [],
+      "validation_events": []
+    },
+    {
+      "attempts": [
+        {
+          "attempt_id": "att-srun-2026-0-00005-0",
+          "currency": "USD",
+          "decision_id": "dec-srun-2026-0-00005",
+          "error_type": null,
+          "estimated_cost": 0.0317144,
+          "input_tokens": 38443,
+          "latency_ms": 2182.7,
+          "model": "balanced",
+          "output_tokens": 300,
+          "provider": "sim",
+          "retry_number": 0,
+          "success": true
+        }
+      ],
+      "completed_at": "2026-09-01T00:25:02.182706Z",
+      "decisions": [
+        {
+          "created_at": "2026-09-01T00:25:00Z",
+          "decision_id": "dec-srun-2026-0-00005",
+          "eligible_models": [
+            "sim/balanced",
+            "sim/flagship"
+          ],
+          "exploration": false,
+          "feature_schema_version": "routing-features.v1",
+          "policy_version": "static-v1",
+          "selected_model": "balanced",
+          "selected_provider": "sim",
+          "selection_probability": 0.85,
+          "shadow": false
+        }
+      ],
+      "feature_schema_version": "routing-features.v1",
+      "feedback": [],
+      "harness_version": "harness-v1",
+      "outcome": {
+        "completed": true,
+        "correction_distance": null,
+        "critical_failure": false,
+        "currency": "USD",
+        "final_cost": 0.0317144,
+        "final_latency_ms": 2182.7,
+        "finalized_at": "2026-09-01T01:25:00Z",
+        "first_shot_success": true,
+        "retry_count": 0,
+        "structured_output_valid": null,
+        "tool_success": null,
+        "user_abandon_signal": false,
+        "user_accept_signal": true,
+        "user_correction_signal": false,
+        "user_retry_signal": false
+      },
+      "policy_version": "static-v1",
+      "prompt_version": "prompt-v1",
+      "request_id": "req-srun-2026-0-00005",
+      "routing_context": {
+        "context_utilization_ratio": 0.3003,
+        "conversation_depth": 12,
+        "estimated_input_tokens": 38443,
+        "latency_slo_ms": 4000,
+        "previous_tool_failure": false,
+        "requires_external_data": false,
+        "requires_memory": false,
+        "requires_structured_output": false,
+        "requires_tools": false,
+        "retry_number": 0,
+        "task_domain": "expenses",
+        "tier": "trika",
+        "tool_count": 0
+      },
+      "run_id": "srun-2026-0-00005",
+      "session_id_hash": "273523413cb4e02e058771cb",
+      "started_at": "2026-09-01T00:25:00Z",
+      "status": "completed",
+      "task_domain": "expenses",
+      "tier": "trika",
+      "tool_events": [],
+      "validation_events": []
+    },
+    {
+      "attempts": [
+        {
+          "attempt_id": "att-srun-2026-0-00006-0",
+          "currency": "USD",
+          "decision_id": "dec-srun-2026-0-00006",
+          "error_type": null,
+          "estimated_cost": 0.0052896,
+          "input_tokens": 5412,
+          "latency_ms": 1941.0,
+          "model": "balanced",
+          "output_tokens": 300,
+          "provider": "sim",
+          "retry_number": 0,
+          "success": true
+        }
+      ],
+      "completed_at": "2026-09-01T00:30:01.940986Z",
+      "decisions": [
+        {
+          "created_at": "2026-09-01T00:30:00Z",
+          "decision_id": "dec-srun-2026-0-00006",
+          "eligible_models": [
+            "sim/cheap",
+            "sim/balanced"
+          ],
+          "exploration": false,
+          "feature_schema_version": "routing-features.v1",
+          "policy_version": "static-v1",
+          "selected_model": "balanced",
+          "selected_provider": "sim",
+          "selection_probability": 0.85,
+          "shadow": false
+        }
+      ],
+      "feature_schema_version": "routing-features.v1",
+      "feedback": [],
+      "harness_version": "harness-v1",
+      "outcome": {
+        "completed": true,
+        "correction_distance": null,
+        "critical_failure": false,
+        "currency": "USD",
+        "final_cost": 0.0052896,
+        "final_latency_ms": 1941.0,
+        "finalized_at": "2026-09-01T01:30:00Z",
+        "first_shot_success": true,
+        "retry_count": 0,
+        "structured_output_valid": null,
+        "tool_success": null,
+        "user_abandon_signal": false,
+        "user_accept_signal": false,
+        "user_correction_signal": false,
+        "user_retry_signal": false
+      },
+      "policy_version": "static-v1",
+      "prompt_version": "prompt-v1",
+      "request_id": "req-srun-2026-0-00006",
+      "routing_context": {
+        "context_utilization_ratio": 0.0423,
+        "conversation_depth": 7,
+        "estimated_input_tokens": 5412,
+        "latency_slo_ms": 10000,
+        "previous_tool_failure": false,
+        "requires_external_data": true,
+        "requires_memory": false,
+        "requires_structured_output": false,
+        "requires_tools": false,
+        "retry_number": 0,
+        "task_domain": "support",
+        "tier": "yanta",
+        "tool_count": 0
+      },
+      "run_id": "srun-2026-0-00006",
+      "session_id_hash": "c49ea0077cde58f2cfc79b3a",
+      "started_at": "2026-09-01T00:30:00Z",
+      "status": "completed",
+      "task_domain": "support",
+      "tier": "yanta",
+      "tool_events": [],
+      "validation_events": []
+    },
+    {
+      "attempts": [
+        {
+          "attempt_id": "att-srun-2026-0-00007-0",
+          "currency": "USD",
+          "decision_id": "dec-srun-2026-0-00007",
+          "error_type": null,
+          "estimated_cost": 0.0044056,
+          "input_tokens": 4307,
+          "latency_ms": 1585.6,
+          "model": "balanced",
+          "output_tokens": 300,
+          "provider": "sim",
+          "retry_number": 0,
+          "success": true
+        }
+      ],
+      "completed_at": "2026-09-01T00:35:01.585583Z",
+      "decisions": [
+        {
+          "created_at": "2026-09-01T00:35:00Z",
+          "decision_id": "dec-srun-2026-0-00007",
+          "eligible_models": [
+            "sim/cheap",
+            "sim/balanced"
+          ],
+          "exploration": false,
+          "feature_schema_version": "routing-features.v1",
+          "policy_version": "static-v1",
+          "selected_model": "balanced",
+          "selected_provider": "sim",
+          "selection_probability": 0.85,
+          "shadow": false
+        }
+      ],
+      "feature_schema_version": "routing-features.v1",
+      "feedback": [],
+      "harness_version": "harness-v1",
+      "outcome": {
+        "completed": true,
+        "correction_distance": null,
+        "critical_failure": false,
+        "currency": "USD",
+        "final_cost": 0.0044056,
+        "final_latency_ms": 1585.6,
+        "finalized_at": "2026-09-01T01:35:00Z",
+        "first_shot_success": true,
+        "retry_count": 0,
+        "structured_output_valid": null,
+        "tool_success": null,
+        "user_abandon_signal": false,
+        "user_accept_signal": false,
+        "user_correction_signal": false,
+        "user_retry_signal": false
+      },
+      "policy_version": "static-v1",
+      "prompt_version": "prompt-v1",
+      "request_id": "req-srun-2026-0-00007",
+      "routing_context": {
+        "context_utilization_ratio": 0.0336,
+        "conversation_depth": 4,
+        "estimated_input_tokens": 4307,
+        "latency_slo_ms": 10000,
+        "previous_tool_failure": false,
+        "requires_external_data": true,
+        "requires_memory": false,
+        "requires_structured_output": false,
+        "requires_tools": false,
+        "retry_number": 0,
+        "task_domain": "travel",
+        "tier": "ananta",
+        "tool_count": 0
+      },
+      "run_id": "srun-2026-0-00007",
+      "session_id_hash": "391a20989fa6a8604081a635",
+      "started_at": "2026-09-01T00:35:00Z",
+      "status": "completed",
+      "task_domain": "travel",
+      "tier": "ananta",
+      "tool_events": [],
+      "validation_events": []
+    },
+    {
+      "attempts": [
+        {
+          "attempt_id": "att-srun-2026-0-00008-0",
+          "currency": "USD",
+          "decision_id": "dec-srun-2026-0-00008",
+          "error_type": null,
+          "estimated_cost": 0.0006845,
+          "input_tokens": 5645,
+          "latency_ms": 876.7,
+          "model": "cheap",
+          "output_tokens": 300,
+          "provider": "sim",
+          "retry_number": 0,
+          "success": true
+        }
+      ],
+      "completed_at": "2026-09-01T00:40:00.876689Z",
+      "decisions": [
+        {
+          "created_at": "2026-09-01T00:40:00Z",
+          "decision_id": "dec-srun-2026-0-00008",
+          "eligible_models": [
+            "sim/cheap",
+            "sim/balanced",
+            "sim/flagship"
+          ],
+          "exploration": true,
+          "feature_schema_version": "routing-features.v1",
+          "policy_version": "static-v1",
+          "selected_model": "cheap",
+          "selected_provider": "sim",
+          "selection_probability": 0.1,
+          "shadow": false
+        }
+      ],
+      "feature_schema_version": "routing-features.v1",
+      "feedback": [],
+      "harness_version": "harness-v1",
+      "outcome": {
+        "completed": true,
+        "correction_distance": null,
+        "critical_failure": false,
+        "currency": "USD",
+        "final_cost": 0.0006845,
+        "final_latency_ms": 876.7,
+        "finalized_at": "2026-09-01T01:40:00Z",
+        "first_shot_success": true,
+        "retry_count": 0,
+        "structured_output_valid": null,
+        "tool_success": null,
+        "user_abandon_signal": false,
+        "user_accept_signal": false,
+        "user_correction_signal": false,
+        "user_retry_signal": false
+      },
+      "policy_version": "static-v1",
+      "prompt_version": "prompt-v1",
+      "request_id": "req-srun-2026-0-00008",
+      "routing_context": {
+        "context_utilization_ratio": 0.0441,
+        "conversation_depth": 5,
+        "estimated_input_tokens": 5645,
+        "latency_slo_ms": null,
+        "previous_tool_failure": false,
+        "requires_external_data": false,
+        "requires_memory": false,
+        "requires_structured_output": false,
+        "requires_tools": false,
+        "retry_number": 0,
+        "task_domain": "ambiguity",
+        "tier": "trika",
+        "tool_count": 0
+      },
+      "run_id": "srun-2026-0-00008",
+      "session_id_hash": "c49ea0077cde58f2cfc79b3a",
+      "started_at": "2026-09-01T00:40:00Z",
+      "status": "completed",
+      "task_domain": "ambiguity",
+      "tier": "trika",
+      "tool_events": [],
+      "validation_events": []
+    },
+    {
+      "attempts": [
+        {
+          "attempt_id": "att-srun-2026-0-00009-0",
+          "currency": "USD",
+          "decision_id": "dec-srun-2026-0-00009",
+          "error_type": "task_failure",
+          "estimated_cost": 0.0741456,
+          "input_tokens": 89882,
+          "latency_ms": 4403.9,
+          "model": "balanced",
+          "output_tokens": 700,
+          "provider": "sim",
+          "retry_number": 0,
+          "success": false
+        }
+      ],
+      "completed_at": "2026-09-01T00:45:04.403851Z",
+      "decisions": [
+        {
+          "created_at": "2026-09-01T00:45:00Z",
+          "decision_id": "dec-srun-2026-0-00009",
+          "eligible_models": [
+            "sim/balanced",
+            "sim/flagship"
+          ],
+          "exploration": false,
+          "feature_schema_version": "routing-features.v1",
+          "policy_version": "static-v1",
+          "selected_model": "balanced",
+          "selected_provider": "sim",
+          "selection_probability": 0.85,
+          "shadow": false
+        }
+      ],
+      "feature_schema_version": "routing-features.v1",
+      "feedback": [
+        {
+          "correction_kind_hint": "schedule",
+          "created_at": "2026-09-01T00:47:00Z",
+          "feedback_id": "fb-srun-2026-0-00009",
+          "feedback_type": "correction",
+          "minutes_after_output": 8,
+          "original_value_hash": "261a40205f902377d7078c794b06033b1db5b25914a60f72168ce55fe03f4b3b",
+          "same_request": true,
+          "sanitized_corrected_value": "[synthetic corrected draft for communication #9]",
+          "sanitized_original_value": "[synthetic draft for communication #9]"
+        }
+      ],
+      "harness_version": "harness-v1",
+      "outcome": {
+        "completed": false,
+        "correction_distance": 0.505,
+        "critical_failure": false,
+        "currency": "USD",
+        "final_cost": 0.0741456,
+        "final_latency_ms": 4403.9,
+        "finalized_at": "2026-09-01T01:45:00Z",
+        "first_shot_success": false,
+        "retry_count": 0,
+        "structured_output_valid": true,
+        "tool_success": null,
+        "user_abandon_signal": false,
+        "user_accept_signal": false,
+        "user_correction_signal": true,
+        "user_retry_signal": false
+      },
+      "policy_version": "static-v1",
+      "prompt_version": "prompt-v1",
+      "request_id": "req-srun-2026-0-00009",
+      "routing_context": {
+        "context_utilization_ratio": 0.7022,
+        "conversation_depth": 4,
+        "estimated_input_tokens": 89882,
+        "latency_slo_ms": null,
+        "previous_tool_failure": false,
+        "requires_external_data": false,
+        "requires_memory": true,
+        "requires_structured_output": true,
+        "requires_tools": false,
+        "retry_number": 0,
+        "task_domain": "communication",
+        "tier": "trika",
+        "tool_count": 0
+      },
+      "run_id": "srun-2026-0-00009",
+      "session_id_hash": "273523413cb4e02e058771cb",
+      "started_at": "2026-09-01T00:45:00Z",
+      "status": "failed",
+      "task_domain": "communication",
+      "tier": "trika",
+      "tool_events": [],
+      "validation_events": [
+        {
+          "error_class": null,
+          "event_id": "val-srun-2026-0-00009",
+          "passed": true,
+          "validator": "structured_output"
+        }
+      ]
+    },
+    {
+      "attempts": [
+        {
+          "attempt_id": "att-srun-2026-0-00010-0",
+          "currency": "USD",
+          "decision_id": "dec-srun-2026-0-00010",
+          "error_type": null,
+          "estimated_cost": 0.0069912,
+          "input_tokens": 7539,
+          "latency_ms": 1854.2,
+          "model": "balanced",
+          "output_tokens": 300,
+          "provider": "sim",
+          "retry_number": 0,
+          "success": true
+        }
+      ],
+      "completed_at": "2026-09-01T00:50:01.854199Z",
+      "decisions": [
+        {
+          "created_at": "2026-09-01T00:50:00Z",
+          "decision_id": "dec-srun-2026-0-00010",
+          "eligible_models": [
+            "sim/cheap",
+            "sim/balanced"
+          ],
+          "exploration": false,
+          "feature_schema_version": "routing-features.v1",
+          "policy_version": "static-v1",
+          "selected_model": "balanced",
+          "selected_provider": "sim",
+          "selection_probability": 0.85,
+          "shadow": false
+        }
+      ],
+      "feature_schema_version": "routing-features.v1",
+      "feedback": [],
+      "harness_version": "harness-v1",
+      "outcome": {
+        "completed": true,
+        "correction_distance": null,
+        "critical_failure": false,
+        "currency": "USD",
+        "final_cost": 0.0069912,
+        "final_latency_ms": 1854.2,
+        "finalized_at": "2026-09-01T01:50:00Z",
+        "first_shot_success": true,
+        "retry_count": 0,
+        "structured_output_valid": null,
+        "tool_success": null,
+        "user_abandon_signal": false,
+        "user_accept_signal": true,
+        "user_correction_signal": false,
+        "user_retry_signal": false
+      },
+      "policy_version": "static-v1",
+      "prompt_version": "prompt-v1",
+      "request_id": "req-srun-2026-0-00010",
+      "routing_context": {
+        "context_utilization_ratio": 0.0589,
+        "conversation_depth": 5,
+        "estimated_input_tokens": 7539,
+        "latency_slo_ms": 4000,
+        "previous_tool_failure": false,
+        "requires_external_data": false,
+        "requires_memory": true,
+        "requires_structured_output": false,
+        "requires_tools": false,
+        "retry_number": 0,
+        "task_domain": "ambiguity",
+        "tier": "yanta",
+        "tool_count": 0
+      },
+      "run_id": "srun-2026-0-00010",
+      "session_id_hash": "c49ea0077cde58f2cfc79b3a",
+      "started_at": "2026-09-01T00:50:00Z",
+      "status": "completed",
+      "task_domain": "ambiguity",
+      "tier": "yanta",
+      "tool_events": [],
+      "validation_events": []
+    },
+    {
+      "attempts": [
+        {
+          "attempt_id": "att-srun-2026-0-00011-0",
+          "currency": "USD",
+          "decision_id": "dec-srun-2026-0-00011",
+          "error_type": null,
+          "estimated_cost": 0.0393912,
+          "input_tokens": 46439,
+          "latency_ms": 2896.5,
+          "model": "balanced",
+          "output_tokens": 700,
+          "provider": "sim",
+          "retry_number": 0,
+          "success": true
+        }
+      ],
+      "completed_at": "2026-09-01T00:55:02.896502Z",
+      "decisions": [
+        {
+          "created_at": "2026-09-01T00:55:00Z",
+          "decision_id": "dec-srun-2026-0-00011",
+          "eligible_models": [
+            "sim/balanced",
+            "sim/flagship"
+          ],
+          "exploration": false,
+          "feature_schema_version": "routing-features.v1",
+          "policy_version": "static-v1",
+          "selected_model": "balanced",
+          "selected_provider": "sim",
+          "selection_probability": 0.85,
+          "shadow": false
+        }
+      ],
+      "feature_schema_version": "routing-features.v1",
+      "feedback": [],
+      "harness_version": "harness-v1",
+      "outcome": {
+        "completed": true,
+        "correction_distance": null,
+        "critical_failure": false,
+        "currency": "USD",
+        "final_cost": 0.0393912,
+        "final_latency_ms": 2896.5,
+        "finalized_at": "2026-09-01T01:55:00Z",
+        "first_shot_success": true,
+        "retry_count": 0,
+        "structured_output_valid": true,
+        "tool_success": null,
+        "user_abandon_signal": false,
+        "user_accept_signal": false,
+        "user_correction_signal": false,
+        "user_retry_signal": false
+      },
+      "policy_version": "static-v1",
+      "prompt_version": "prompt-v1",
+      "request_id": "req-srun-2026-0-00011",
+      "routing_context": {
+        "context_utilization_ratio": 0.3628,
+        "conversation_depth": 3,
+        "estimated_input_tokens": 46439,
+        "latency_slo_ms": 4000,
+        "previous_tool_failure": false,
+        "requires_external_data": false,
+        "requires_memory": true,
+        "requires_structured_output": true,
+        "requires_tools": false,
+        "retry_number": 0,
+        "task_domain": "travel",
+        "tier": "part",
+        "tool_count": 0
+      },
+      "run_id": "srun-2026-0-00011",
+      "session_id_hash": "c49ea0077cde58f2cfc79b3a",
+      "started_at": "2026-09-01T00:55:00Z",
+      "status": "completed",
+      "task_domain": "travel",
+      "tier": "part",
+      "tool_events": [],
+      "validation_events": [
+        {
+          "error_class": null,
+          "event_id": "val-srun-2026-0-00011",
+          "passed": true,
+          "validator": "structured_output"
+        }
+      ]
+    }
+  ],
+  "schema": "TelemetryBatchV1",
+  "schema_version": "1.0.0",
+  "window": {
+    "cursor": "2026:0",
+    "end": "2026-09-02T00:00:00Z",
+    "start": "2026-09-01T00:00:00Z"
+  }
+}

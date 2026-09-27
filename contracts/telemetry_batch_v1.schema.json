@@ -1,0 +1,102 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Rossonerian/Parakh/contracts/telemetry_batch_v1.schema.json",
+  "title": "TelemetryBatchV1",
+  "description": "Sanitized Karmi routing/outcome evidence exported to Parakh. Parakh's parser (model_lab/telemetry/schema.py) is authoritative; runs failing validation are quarantined, not coerced.",
+  "type": "object",
+  "required": ["schema", "schema_version", "batch_id", "generated_at", "producer", "feature_schema_version", "model_registry", "runs"],
+  "properties": {
+    "schema": {"const": "TelemetryBatchV1"},
+    "schema_version": {"type": "string", "pattern": "^1\\."},
+    "batch_id": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}$", "description": "Idempotency key; same id with different content is rejected."},
+    "generated_at": {"type": "string"},
+    "producer": {"type": "object", "required": ["repo", "version"], "properties": {"repo": {"type": "string"}, "version": {"type": "string"}}},
+    "feature_schema_version": {"type": "string"},
+    "window": {"type": "object", "properties": {"start": {"type": "string"}, "end": {"type": "string"}, "cursor": {"type": "string"}}},
+    "model_registry": {
+      "type": "array", "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["provider", "model", "max_context_tokens", "supports_tools", "supports_structured_output", "estimated_input_cost_per_token", "estimated_output_cost_per_token"],
+        "properties": {
+          "provider": {"type": "string"}, "model": {"type": "string"}, "model_version": {"type": ["string", "null"]},
+          "max_context_tokens": {"type": "integer", "minimum": 1}, "supports_tools": {"type": "boolean"},
+          "supports_structured_output": {"type": "boolean"},
+          "estimated_input_cost_per_token": {"type": "number", "minimum": 0}, "estimated_output_cost_per_token": {"type": "number", "minimum": 0}
+        }
+      }
+    },
+    "runs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["run_id", "request_id", "started_at", "task_domain", "tier", "harness_version", "prompt_version", "policy_version", "feature_schema_version", "status", "routing_context", "decisions", "outcome"],
+        "properties": {
+          "run_id": {"type": "string"}, "request_id": {"type": "string"}, "session_id_hash": {"type": ["string", "null"]},
+          "started_at": {"type": "string"}, "completed_at": {"type": ["string", "null"]},
+          "task_domain": {"type": "string"}, "tier": {"type": "string"}, "harness_version": {"type": "string"},
+          "prompt_version": {"type": "string"}, "policy_version": {"type": "string"}, "feature_schema_version": {"type": "string"},
+          "status": {"type": "string"},
+          "routing_context": {
+            "type": "object",
+            "required": ["tier", "task_domain", "estimated_input_tokens", "context_utilization_ratio", "tool_count", "requires_structured_output", "requires_tools", "requires_memory", "requires_external_data", "conversation_depth", "retry_number", "previous_tool_failure"],
+            "properties": {
+              "tier": {"type": "string"}, "task_domain": {"type": "string"},
+              "estimated_input_tokens": {"type": "integer", "minimum": 0}, "context_utilization_ratio": {"type": "number", "minimum": 0, "maximum": 1},
+              "tool_count": {"type": "integer", "minimum": 0}, "requires_structured_output": {"type": "boolean"}, "requires_tools": {"type": "boolean"},
+              "requires_memory": {"type": "boolean"}, "requires_external_data": {"type": "boolean"},
+              "conversation_depth": {"type": "integer", "minimum": 0}, "retry_number": {"type": "integer", "minimum": 0},
+              "previous_tool_failure": {"type": "boolean"}, "latency_slo_ms": {"type": ["integer", "null"]},
+              "previous_structured_output_failure": {"type": ["boolean", "null"]}
+            }
+          },
+          "decisions": {
+            "type": "array", "minItems": 1,
+            "description": "Exactly one live (shadow=false) decision: the executed action. Shadow decisions record what a candidate policy would have chosen.",
+            "items": {
+              "type": "object",
+              "required": ["decision_id", "selected_provider", "selected_model", "policy_version", "selection_probability", "exploration", "shadow", "eligible_models", "feature_schema_version", "created_at"],
+              "properties": {
+                "decision_id": {"type": "string"}, "selected_provider": {"type": "string"}, "selected_model": {"type": "string"},
+                "policy_version": {"type": "string"},
+                "selection_probability": {"type": "number", "exclusiveMinimum": 0, "maximum": 1, "description": "Exact logged propensity p(a|x). Mandatory."},
+                "exploration": {"type": "boolean"}, "shadow": {"type": "boolean"},
+                "eligible_models": {"type": "array", "minItems": 1, "items": {"type": "string", "description": "provider/model"}},
+                "feature_schema_version": {"type": "string"}, "created_at": {"type": "string"}
+              }
+            }
+          },
+          "attempts": {"type": "array", "items": {"type": "object", "required": ["attempt_id", "provider", "model", "success", "retry_number"]}},
+          "tool_events": {"type": "array", "items": {"type": "object", "required": ["event_id", "tool_name", "schema_valid", "execution_success"]}},
+          "validation_events": {"type": "array", "items": {"type": "object", "required": ["event_id", "validator", "passed"]}},
+          "outcome": {
+            "type": "object",
+            "properties": {
+              "completed": {"type": ["boolean", "null"]}, "first_shot_success": {"type": ["boolean", "null"]},
+              "structured_output_valid": {"type": ["boolean", "null"]}, "tool_success": {"type": ["boolean", "null"]},
+              "retry_count": {"type": ["integer", "null"], "minimum": 0}, "user_retry_signal": {"type": ["boolean", "null"]},
+              "user_abandon_signal": {"type": ["boolean", "null"]}, "user_accept_signal": {"type": ["boolean", "null"]},
+              "user_correction_signal": {"type": ["boolean", "null"]}, "correction_distance": {"type": ["number", "null"]},
+              "final_latency_ms": {"type": ["number", "null"], "minimum": 0}, "final_cost": {"type": ["number", "null"], "minimum": 0},
+              "currency": {"type": ["string", "null"]}, "finalized_at": {"type": ["string", "null"]}, "critical_failure": {"type": ["boolean", "null"]}
+            }
+          },
+          "feedback": {
+            "type": "array",
+            "items": {
+              "type": "object", "required": ["feedback_id", "feedback_type", "created_at"],
+              "properties": {
+                "feedback_type": {"enum": ["edit", "correction", "rating", "retry", "abandon", "accept", "intent_change", "other"]},
+                "original_value_hash": {"type": ["string", "null"]},
+                "sanitized_original_value": {"type": ["string", "null"], "description": "Only when retention rules permit; must already be sanitized."},
+                "sanitized_corrected_value": {"type": ["string", "null"]},
+                "correction_kind_hint": {"type": ["string", "null"], "description": "factual | intent_change | style | schedule | repair | null"},
+                "minutes_after_output": {"type": ["integer", "null"]}, "same_request": {"type": ["boolean", "null"]}
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

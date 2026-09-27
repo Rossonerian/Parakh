@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Rossonerian/Parakh/contracts/policy_bundle_v1.schema.json",
+  "title": "PolicyBundleV1",
+  "description": "Schemas for the JSON files of an immutable Parakh policy bundle directory. Layout: manifest.json, routing_policy.json, feature_schema.json, eligibility_constraints.json, [harness/prompts.json, harness/recovery_policy.json], evaluation.json, provenance.json, checksums.json, signature.sig. checksums.json lists sha256 of every other file; signature.sig is an Ed25519 signature over the exact bytes of checksums.json.",
+  "$defs": {
+    "manifest": {
+      "type": "object",
+      "required": ["schema", "schema_version", "artifact_version", "policy_schema_version", "feature_schema_version", "feature_schema_id", "algorithm", "minimum_karmi_version", "previous_compatible_version", "model_registry", "evaluation_run_ids", "created_at", "policy_candidate_id", "evidence_class", "signing_key_id", "files", "parakh_status"],
+      "properties": {
+        "schema": {"const": "PolicyBundleV1"},
+        "schema_version": {"type": "string", "pattern": "^1\\."},
+        "artifact_version": {"type": "string", "pattern": "^policy-[0-9]{4}\\.[0-9]{2}\\.[0-9]{2}\\.[0-9]+$"},
+        "policy_schema_version": {"type": "string"},
+        "feature_schema_version": {"type": "string"},
+        "feature_schema_id": {"type": "string"},
+        "algorithm": {"enum": ["linucb"]},
+        "minimum_karmi_version": {"type": "string"},
+        "previous_compatible_version": {"type": ["string", "null"]},
+        "model_registry": {"type": "array", "minItems": 1, "items": {"type": "object", "required": ["action", "provider", "model"], "properties": {"action": {"type": "string"}, "provider": {"type": "string"}, "model": {"type": "string"}, "model_version": {"type": ["string", "null"]}}}},
+        "evaluation_run_ids": {"type": "array", "items": {"type": "string"}},
+        "created_at": {"type": "string"},
+        "policy_candidate_id": {"type": "string"},
+        "evidence_class": {"enum": ["SIMULATED", "MEASURED", "MIXED"], "description": "SIMULATED bundles come from synthetic environments/fake providers and are not production evidence."},
+        "signing_key_id": {"type": "string"},
+        "files": {"type": "array", "items": {"type": "string"}},
+        "parakh_status": {"const": "EXPORTED", "description": "Parakh's final state. Karmi owns RECEIVED -> STAGED -> SHADOW -> CANARY -> PRODUCTION; Parakh never sets them."},
+        "recommended_karmi_mode": {"const": "shadow"}
+      }
+    },
+    "routing_policy": {
+      "type": "object",
+      "required": ["algorithm", "policy_schema_version", "feature_schema_version", "feature_dimension", "actions", "alpha", "exploration", "parameters", "selection", "fallback"],
+      "properties": {
+        "algorithm": {"const": "linucb"},
+        "policy_schema_version": {"type": "string"},
+        "feature_schema_version": {"type": "string"},
+        "feature_dimension": {"type": "integer", "minimum": 1},
+        "actions": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+        "alpha": {"type": "number", "minimum": 0},
+        "exploration": {"type": "object", "required": ["mode", "epsilon"], "properties": {"mode": {"enum": ["none", "epsilon_greedy"]}, "epsilon": {"type": "number", "minimum": 0, "maximum": 1}}},
+        "parameters": {"type": "object", "description": "action -> {theta: [d], a_inv: [d][d]}"},
+        "selection": {"const": "score = theta.x + alpha*sqrt(x.A_inv.x) over eligible known actions; greedy = argmax, ties -> lexicographically smallest action; epsilon_greedy: greedy gets 1-eps+eps/k, others eps/k (k = eligible known actions)"},
+        "fallback": {"const": "static", "description": "No eligible known action or invalid features -> caller's static policy."}
+      }
+    },
+    "checksums": {
+      "type": "object", "required": ["algorithm", "files"],
+      "properties": {"algorithm": {"const": "sha256"}, "files": {"type": "object"}}
+    },
+    "signature": {
+      "type": "object", "required": ["algorithm", "key_id", "public_key", "signature", "signed_file"],
+      "properties": {"algorithm": {"const": "ed25519"}, "key_id": {"type": "string"}, "public_key": {"type": "string"}, "signature": {"type": "string"}, "signed_file": {"const": "checksums.json"}}
+    }
+  }
+}
