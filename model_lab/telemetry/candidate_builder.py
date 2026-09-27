@@ -41,8 +41,7 @@ def should_create_candidate(run: RunRecord, novelty: Novelty, threshold: float =
     outcome = run.outcome if isinstance(run.outcome, Mapping) else {}
     if novelty.score >= threshold:
         return True
-    if outcome.get("completed") is False:
-        return True
+    # Ordinary failures qualify only through novelty (new failure signature), not by volume.
     if outcome.get("critical_failure") is True:
         return True
     if outcome.get("user_correction_signal") is True:
@@ -111,22 +110,13 @@ def build_and_store_candidate(
     # Check session candidates first (earlier in this import)
     candidates_to_check: list[dict[str, Any]] = list(session_candidates or [])
 
-    # Check store candidates with same structural signature
-    try:
-        existing_with_sig = evidence.list("evaluation_candidates", structural_signature=run_struct)
-        candidates_to_check.extend(existing_with_sig)
-    except Exception:
-        pass
-
-    # Check all store candidates if duplicate not found yet
-    try:
-        all_store_cands = evidence.list("evaluation_candidates")
-    except Exception:
-        all_store_cands = []
+    # Exact duplicates share the structural signature (it is derived from the same content), so the
+    # indexed signature lookup is sufficient; no full-table scan per run.
+    candidates_to_check.extend(evidence.list("evaluation_candidates", structural_signature=run_struct))
 
     seen_ids: set[str] = set()
     all_combined = []
-    for c in (*candidates_to_check, *all_store_cands):
+    for c in candidates_to_check:
         c_id = c.get("candidate_id")
         if c_id and c_id != cand_id and c_id not in seen_ids:
             seen_ids.add(c_id)

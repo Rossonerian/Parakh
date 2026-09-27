@@ -251,3 +251,19 @@ def test_import_from_path_and_envelope_errors(tmp_path: Path) -> None:
     bad_batch = {"schema": "InvalidTelemetry"}
     with pytest.raises(TelemetryBatchError):
         import_batch(store, bad_batch)
+
+
+def test_novelty_history_excludes_the_batch_being_scored_and_candidates_stay_selective(tmp_path):
+    from model_lab.storage import SQLiteStore
+    from model_lab.storage.evidence import EvidenceStore
+    from model_lab.telemetry.importer import import_batch
+    from model_lab.telemetry.synthetic import generate_batch
+
+    store = SQLiteStore(tmp_path / "novelty.sqlite3")
+    result = import_batch(store, generate_batch(seed=31, runs=600))
+    candidates = EvidenceStore(store).list("evaluation_candidates")
+    first = min(candidates, key=lambda c: c["source_run_id"])
+    assert first["source_run_id"].endswith("-00000")  # first run of an empty store is novel
+    assert first["novelty"]["components"]["feature_distance"] == 1.0
+    assert first["novelty"]["components"]["domain_rarity"] == 1.0
+    assert 0 < result.candidates < result.accepted * 0.5  # high-information subset, not every run

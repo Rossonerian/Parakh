@@ -20,7 +20,7 @@ from model_lab.storage.sqlite import SQLiteStore
 from model_lab.telemetry.candidate_builder import build_and_store_candidate
 from model_lab.telemetry.novelty import NoveltyContext, score
 from model_lab.telemetry.privacy import scan
-from model_lab.telemetry.schema import RunRecord, batch_checksum, parse_batch
+from model_lab.telemetry.schema import RunRecord, parse_batch
 
 
 @dataclass(frozen=True)
@@ -70,7 +70,7 @@ def import_batch(
     parsed = parse_batch(raw_batch)
 
     evidence = EvidenceStore(store)
-    checksum = batch_checksum(raw_batch)
+    checksum = parsed.checksum
     import_id = f"imp-{checksum[:24]}"
 
     # Check for existing imports with this batch_id
@@ -175,6 +175,10 @@ def import_batch(
                     },
                 )
                 accepted_runs.append((index, record_id, run_rec))
+
+    # History is taken BEFORE this batch writes anything, so runs are never compared with themselves.
+    novelty_ctx = NoveltyContext.from_store(evidence)
+    novelty_ctx.register_model_catalog(parsed.model_registry)
 
     # b) accepted runs: router_observations
     observation_count = 0
@@ -284,14 +288,13 @@ def import_batch(
             step_idx += 1
 
     # d) candidates via candidate_builder
-    novelty_ctx = NoveltyContext.from_store(evidence)
-    novelty_ctx.register_model_catalog(parsed.model_registry)
     session_candidates: list[dict[str, Any]] = []
     candidate_count = 0
     duplicates_marked = 0
 
     for _, record_id, run_rec in accepted_runs:
         nov = score(run_rec, novelty_ctx)
+        novelty_ctx.observe(run_rec, extract(run_rec.routing_context), run_rec.live_decision.action)
         cand = build_and_store_candidate(
             evidence,
             run_rec,

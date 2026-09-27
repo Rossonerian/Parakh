@@ -77,6 +77,14 @@ def stable_hash(value: Any) -> str:
 
 
 def _plain(value: Any) -> Any:
+    # Fast paths for the JSON-native types that dominate evidence records (same results as below).
+    kind = type(value)
+    if kind is str or kind is int or kind is float or kind is bool or value is None:
+        return value
+    if kind is dict:
+        return {str(k): _plain(v) for k, v in value.items()}
+    if kind is list or kind is tuple:
+        return [_plain(v) for v in value]
     if isinstance(value, Enum):
         return value.value
     if is_dataclass(value):

@@ -8,6 +8,7 @@ never a feature. Changing any entry requires a new ``FEATURE_SCHEMA_VERSION``.
 
 from __future__ import annotations
 
+import copy
 import math
 from typing import Any, Mapping
 
@@ -43,11 +44,18 @@ FEATURES: tuple[dict[str, Any], ...] = (
 )
 
 
-def feature_schema() -> dict[str, Any]:
-    """The exportable ``feature_schema.json`` document."""
+def _build_schema() -> dict[str, Any]:
     body = {"feature_schema_version": FEATURE_SCHEMA_VERSION, "dimension": len(FEATURES), "features": [dict(f) for f in FEATURES],
             "missing_value_policy": "optional sources absent or null -> 0.0; required sources absent -> reject context"}
     return {**body, "schema_id": stable_hash(body)[:16]}
+
+
+_SCHEMA = _build_schema()
+
+
+def feature_schema() -> dict[str, Any]:
+    """The exportable ``feature_schema.json`` document (a fresh copy; the module constant is never exposed)."""
+    return copy.deepcopy(_SCHEMA)
 
 
 def _apply(spec: Mapping[str, Any], context: Mapping[str, Any]) -> float:
@@ -82,5 +90,5 @@ def _apply(spec: Mapping[str, Any], context: Mapping[str, Any]) -> float:
 
 def extract(context: Mapping[str, Any], schema: Mapping[str, Any] | None = None) -> tuple[float, ...]:
     """Deterministic feature vector for a Karmi RoutingContext mapping."""
-    specs = (schema or feature_schema())["features"]
+    specs = (schema or _SCHEMA)["features"]
     return tuple(_apply(spec, context) for spec in specs)

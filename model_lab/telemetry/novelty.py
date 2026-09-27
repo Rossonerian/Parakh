@@ -27,7 +27,7 @@ class Novelty:
 @dataclass
 class NoveltyContext:
     domains: list[str] = field(default_factory=list)
-    feature_vectors: list[tuple[float, ...]] = field(default_factory=list)
+    feature_buckets: dict[tuple[str, str], list[tuple[float, ...]]] = field(default_factory=lambda: defaultdict(list))
     failure_signatures: set[tuple[tuple[str, ...], bool | None]] = field(default_factory=set)
     tool_combinations: set[tuple[str, ...]] = field(default_factory=set)
     costs_by_action: dict[str, list[float]] = field(default_factory=lambda: defaultdict(list))
@@ -40,69 +40,71 @@ class NoveltyContext:
         ctx = cls()
 
         # Load models from imports
-        try:
-            imports = evidence.list("telemetry_imports")
-            for imp in imports:
-                for m in imp.get("model_registry", []):
-                    action = f"{m.get('provider')}/{m.get('model')}"
-                    max_ctx = m.get("max_context_tokens")
-                    if isinstance(max_ctx, int):
-                        ctx.model_registry[action] = max_ctx
-        except Exception:
-            pass
+        imports = evidence.list("telemetry_imports")
+        for imp in imports:
+            for m in imp.get("model_registry", []):
+                action = f"{m.get('provider')}/{m.get('model')}"
+                max_ctx = m.get("max_context_tokens")
+                if isinstance(max_ctx, int):
+                    ctx.model_registry[action] = max_ctx
 
         # Load router observations
         run_actions: dict[str, str] = {}
-        try:
-            obs_list = evidence.list("router_observations")
-            for obs in obs_list:
-                domain = obs.get("task_domain")
-                if domain:
-                    ctx.domains.append(domain)
-                feats = obs.get("features")
-                if isinstance(feats, (list, tuple)):
-                    ctx.feature_vectors.append(tuple(float(x) for x in feats))
-                if not obs.get("shadow"):
-                    run_id = obs.get("run_id")
-                    action = obs.get("chosen_action")
-                    if run_id and action:
-                        run_actions[run_id] = action
-        except Exception:
-            pass
+        obs_list = evidence.list("router_observations")
+        for obs in obs_list:
+            domain = obs.get("task_domain")
+            if domain:
+                ctx.domains.append(domain)
+            feats = obs.get("features")
+            if isinstance(feats, (list, tuple)) and not obs.get("shadow"):
+                ctx.feature_buckets[(str(obs.get("tier")), str(domain))].append(tuple(float(x) for x in feats))
+            if not obs.get("shadow"):
+                run_id = obs.get("run_id")
+                action = obs.get("chosen_action")
+                if run_id and action:
+                    run_actions[run_id] = action
 
         # Load trajectories for cost/latency outliers
-        try:
-            trajs = evidence.list("trajectories")
-            for traj in trajs:
-                run_id = traj.get("run_id")
-                action = run_actions.get(run_id)
-                outcome = traj.get("final_outcome", {})
-                if action and isinstance(outcome, Mapping):
-                    cost = outcome.get("final_cost")
-                    if isinstance(cost, (int, float)):
-                        ctx.costs_by_action[action].append(float(cost))
-                    lat = outcome.get("final_latency_ms")
-                    if isinstance(lat, (int, float)):
-                        ctx.latencies_by_action[action].append(float(lat))
-        except Exception:
-            pass
+        trajs = evidence.list("trajectories")
+        for traj in trajs:
+            run_id = traj.get("run_id")
+            action = run_actions.get(run_id)
+            outcome = traj.get("final_outcome", {})
+            if action and isinstance(outcome, Mapping):
+                cost = outcome.get("final_cost")
+                if isinstance(cost, (int, float)):
+                    ctx.costs_by_action[action].append(float(cost))
+                lat = outcome.get("final_latency_ms")
+                if isinstance(lat, (int, float)):
+                    ctx.latencies_by_action[action].append(float(lat))
 
         # Load candidates for tool combinations and failure signatures
-        try:
-            cands = evidence.list("evaluation_candidates")
-            for cand in cands:
-                case = cand.get("case", {})
-                tools = case.get("tool_names")
-                if isinstance(tools, (list, tuple)) and tools:
-                    ctx.tool_combinations.add(tuple(tools))
-                fail_sig = case.get("failure_signature")
-                if isinstance(fail_sig, (list, tuple)) and len(fail_sig) == 2:
-                    errors = tuple(fail_sig[0]) if isinstance(fail_sig[0], (list, tuple)) else ()
-                    ctx.failure_signatures.add((errors, fail_sig[1]))
-        except Exception:
-            pass
+        cands = evidence.list("evaluation_candidates")
+        for cand in cands:
+            case = cand.get("case", {})
+            tools = case.get("tool_names")
+            if isinstance(tools, (list, tuple)) and tools:
+                ctx.tool_combinations.add(tuple(tools))
+            fail_sig = case.get("failure_signature")
+            if isinstance(fail_sig, (list, tuple)) and len(fail_sig) == 2:
+                errors = tuple(fail_sig[0]) if isinstance(fail_sig[0], (list, tuple)) else ()
+                ctx.failure_signatures.add((errors, fail_sig[1]))
 
         return ctx
+
+    def observe(self, run: RunRecord, features: Sequence[float], action: str) -> None:
+        """Add a scored run to history so later runs in the same batch are compared against it."""
+        self.domains.append(run.task_domain)
+        self.feature_buckets[(run.tier, run.task_domain)].append(tuple(float(x) for x in features))
+        self.failure_signatures.add(_run_failure_signature(run))
+        tools = tuple(sorted({str(t.get("tool_name")) for t in run.tool_events if t.get("tool_name")}))
+        if tools:
+            self.tool_combinations.add(tools)
+        cost, latency = run.outcome.get("final_cost"), run.outcome.get("final_latency_ms")
+        if isinstance(cost, (int, float)) and not isinstance(cost, bool):
+            self.costs_by_action[action].append(float(cost))
+        if isinstance(latency, (int, float)) and not isinstance(latency, bool):
+            self.latencies_by_action[action].append(float(latency))
 
     def register_model_catalog(self, catalog: Sequence[Mapping[str, Any]]) -> None:
         """Register model info entries into the registry."""
@@ -133,26 +135,20 @@ def score(run: RunRecord, history: NoveltyContext) -> Novelty:
     """Score the novelty of a validated run in [0, 1] relative to historical context."""
     components: dict[str, float] = {}
 
-    # 1. domain_rarity: 1 - share of domain in history
-    if not history.domains:
-        components["domain_rarity"] = 1.0
-    else:
-        domain_count = sum(1 for d in history.domains if d == run.task_domain)
-        share = domain_count / len(history.domains)
-        components["domain_rarity"] = max(0.0, min(1.0, 1.0 - share))
+    # 1. domain_rarity: decays with how often the domain has been seen (5 / (count + 5)); 1.0 when unseen
+    domain_count = sum(1 for d in history.domains if d == run.task_domain)
+    components["domain_rarity"] = 5.0 / (domain_count + 5.0)
 
-    # 2. feature_distance: min L2 distance of feature vector to history vectors, scaled by sqrt(dim); 1.0 when no history
+    # 2. feature_distance: min L2 distance to history vectors of the same (tier, domain), scaled by sqrt(dim);
+    #    1.0 when that bucket is empty. Bucketing keeps this O(bucket) instead of O(history).
     feat_vec = extract(run.routing_context)
     dim = len(feat_vec)
-    if not history.feature_vectors or dim == 0:
+    bucket = history.feature_buckets.get((run.tier, run.task_domain), [])
+    if not bucket:
         components["feature_distance"] = 1.0
     else:
-        min_dist_sq = min(
-            sum((a - b) ** 2 for a, b in zip(feat_vec, h_vec, strict=False))
-            for h_vec in history.feature_vectors
-        )
-        l2 = math.sqrt(min_dist_sq)
-        components["feature_distance"] = max(0.0, min(1.0, l2 / math.sqrt(dim)))
+        min_dist_sq = min(sum((a - b) ** 2 for a, b in zip(feat_vec, h_vec, strict=True)) for h_vec in bucket)
+        components["feature_distance"] = max(0.0, min(1.0, math.sqrt(min_dist_sq) / math.sqrt(dim)))
 
     # 3. new_failure_signature
     sig_errors, completed = _run_failure_signature(run)
@@ -172,7 +168,8 @@ def score(run: RunRecord, history: NoveltyContext) -> Novelty:
     # 5. shadow_disagreement
     live_act = run.live_decision.action
     has_disagreement = any(d.action != live_act for d in run.shadow_decisions)
-    components["shadow_disagreement"] = 1.0 if has_disagreement else 0.0
+    # Disagreement is informative but common during shadow cycles, so it cannot alone make a run a candidate.
+    components["shadow_disagreement"] = 0.5 if has_disagreement else 0.0
 
     # 6. correction_magnitude
     corr_dist = run.outcome.get("correction_distance") if isinstance(run.outcome, Mapping) else None
