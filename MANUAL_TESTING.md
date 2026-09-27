@@ -29,6 +29,12 @@ make PYTHON=.venv/bin/python tui                      # workspace lab-data/tui; 
 
 Also: **Compare (`8`)** two runs → matched-case dimensions and **Routing (`0`)** `PROPOSED` drafts with their blocking limitations; **Models (`4`)** → enter a plan path → *Preflight plan* shows the gate is closed (paid dispatch is CLI-only). `q` exits and restores the terminal.
 
+### Optimization operator views
+
+On an offline workspace populated with `telemetry import`, press `t` for telemetry candidate quarantine and lineage; select a candidate, enter a named actor and reason, choose a dataset role, then approve or reject. Press `p` for correction-derived preference pairs: ambiguous pairs need an explicit genuine-correction proposal before approval; changed intent and style edits never become automatic training labels. Press `o` for policy verification gates, provenance limitations and compounding metrics. These are **operator** views separate from the blinded human grader tab `9`; do not use them to grade anonymous benchmark responses. Empty workspaces show instructions without creating an evidence DB.
+
+The synthetic flywheel commands and contract locations are in `README.md` and `contracts/README.md`. A passing fixture run must be labeled `SIMULATED`, with a signed bundle accepted by the independent reference loader in shadow mode and no active-policy mutation. Record default verifier failures before supplying any real owner-approved tier cost/latency ceilings. `harness optimize` keeps the holdout sealed during search; core rubric-only holdout requires actual blinded review for promotion. No fake score substitutes for review, real Karmi integration, or paid provider evidence.
+
 ## Benchmark validation and candidate export
 
 ```bash

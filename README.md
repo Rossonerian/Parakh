@@ -10,10 +10,9 @@ Prepared 2026-09-09 for a WhatsApp-first assistant with four subscriptions and f
 4. Paste Start_Project_Prompt.md into the Boss thread to implement the bounded core release with tests and evidence.
 5. To build the Linux model comparison tool independently, paste Testing_Lab_Prompt.md into a Codex thread with Model_Testing_Spec.md and benchmarks/ available.
 
-## ModelLab (implemented)
+## ModelLab and offline optimization engine
 
-`model_lab/` is a working, offline-first evaluation lab (Python ≥ 3.12, no runtime dependencies; the console needs the `tui` extra). The Daily AI Agent product itself is still specification only.
-
+`model_lab/` is a working offline-first Python ≥3.12 evaluation lab with a versioned optimization lane. The console requires the `tui` extra; the Daily AI Agent product remains specification-only. No live Karmi integration or paid-provider measurements are implied.
 ```bash
 python -m venv .venv && .venv/bin/pip install -e '.[dev]'   # pytest, ruff, textual
 make PYTHON=.venv/bin/python tui            # interactive console; starts the offline DEMO on an empty workspace
@@ -25,9 +24,35 @@ make PYTHON=.venv/bin/python test-release   # lint + doctor + unit + integration
 
 From any directory: `scripts/parakh` (alias it, e.g. `alias parakh=/path/to/Parakh/scripts/parakh`) — `parakh` opens the console, `parakh demo` opens it with the offline demo, `parakh stop` stops a console running in another terminal, `parakh status`, `parakh cli <args>`. It bootstraps `.venv` with the `tui` extra on first use.
 
-Console navigation: `1`–`9`, `0`, `l` switch tabs (Dashboard, Suites, Cases, Models, Runs, Run detail, Results, Compare, Review, Routing, Events); `d` demo, `f` fake-provider run, `g` grade, `v` validate, `h` doctor, `r` refresh, `q` quit. Run data lives in `lab-data/tui/model_lab.sqlite3` (gitignored). Everything shown comes from that store; demo data is labelled `SIMULATED`, missing measurements show `N/A`/`not measured`, and the console cannot start paid/live calls — those remain `model-lab pilot run … --allow-paid` with a verified immutable plan. See `Model_Testing_Spec.md` → *Interactive console* and `MANUAL_TESTING.md`.
+Console navigation: `1`–`9`, `0`, `t`, `p`, `o`, `l` select Dashboard through Routing, telemetry Candidates, Preferences, Policies, Events. Candidate and preference tabs require named actor/reason for audited review; the Policy tab displays gates and compounding metrics. `d` demo, `f` fake-provider run, `g` grade, `v` validate, `h` doctor, `r` refresh, `q` quit. Run data lives in `lab-data/tui/model_lab.sqlite3` (gitignored). Demo data is `SIMULATED`; missing measurements show `N/A`. The console cannot start paid/live calls — those remain `model-lab pilot run … --allow-paid` with a verified immutable plan. See `MANUAL_TESTING.md`.
 
-Layout: `cli/` (argparse surface) → `pipeline.py`, `pilot.py` and feature modules → `application/` (execution engine, reporting, event log, observability read model, operator actions) → `domain/` (isolation, budget) → `storage/` (SQLite) and `providers/` (fake, gated live). `tui/` renders the observability read model only. Module map and invariants: `model_lab/CLAUDE.md`.
+### Offline optimization loop
+
+The commands below operate on a disposable SQLite evidence file; they do not dispatch providers or write production configuration. The fixture is **synthetic**, not evidence of a Karmi deployment. Use `--help` on each subcommand for flags. IDs printed by earlier commands replace placeholders.
+
+```bash
+P=.venv/bin/python
+DB=/tmp/parakh-opt/model_lab.sqlite3
+$P -m model_lab telemetry synthesize --out /tmp/parakh-opt/batch.json --seed 21 --runs 4000 --epsilon 0.5 --base-policy balanced_only
+$P -m model_lab telemetry import /tmp/parakh-opt/batch.json --db \"$DB\"
+$P -m model_lab candidates list --db \"$DB\"  # explicit candidates approve ID --role TRAIN_ONLY --actor NAME --reason WHY
+$P -m model_lab reward compute all --db \"$DB\"
+$P -m model_lab router dataset --db \"$DB\" --seed 37
+$P -m model_lab router train DATASET_ID --db \"$DB\" --seed 37
+$P -m model_lab router evaluate CANDIDATE_ID --db \"$DB\"
+$P -m model_lab router benchmark --db \"$DB\" --out /tmp/parakh-opt/bench.json
+$P -m model_lab verify CANDIDATE_ID --db \"$DB\" --benchmark-runs /tmp/parakh-opt/bench.json --config /secure/owner-ceilings.json --report-dir /tmp/parakh-opt/report
+$P -m model_lab policy approve CANDIDATE_ID --db \"$DB\" --actor NAME --reason WHY
+$P -m model_lab artifact keygen --path /secure/parakh-signing-key.hex
+$P -m model_lab artifact export CANDIDATE_ID --db \"$DB\" --out /tmp/parakh-opt/bundles --key-path /secure/parakh-signing-key.hex --actor NAME
+$P -m model_lab artifact karmi-check BUNDLE_PATH --trusted-public-key PUBLIC_KEY_HEX
+```
+
+`verify` fails closed on missing support, regression evidence, dirty Git or unapproved cost/latency envelopes; default envelopes are *provisional* relative bounds, not owner authorization. Supply explicitly approved `tier_cost_ceiling_usd` and `tier_latency_ceiling_ms` mappings only after measuring the applicable tiers. Signed bundles are read-only JSON with Ed25519 signatures; the bundled Karmi **reference fixture** loads into shadow while its active policy stays static. Trust a known public key out-of-band; never publish private signing keys. Import a subsequent simulated shadow batch with `telemetry synthesize --shadow-bundle BUNDLE_PATH --trusted-public-key PUBLIC_KEY_HEX --batch-index 1`, then `telemetry import` to close the fixture loop. `harness optimize`, `preferences extract/review/export` and `policy report` are separate offline commands. Shared formats: `contracts/README.md`.
+
+The frozen 60-case core stays at `benchmarks/seed_cases.jsonl`; its family splits are 36 train / 12 calibration / 12 sealed holdout. The core holdout is rubric-only and requires blind human review for harness promotion; fake results do not satisfy that gate. Real Karmi shadow telemetry and provider/payment/manual release gates remain unobserved. Offline fixture success is **not production readiness**.
+
+Layout: `cli/` (argparse surface) → `pipeline.py`, `pilot.py` and optimization modules → `application/` (execution, reporting, operator views) → `domain/` (isolation, budget) → `storage/` (SQLite evidence) and `providers/` (fake, gated live). `tui/` renders the read model and separate operator reviews. Module map: `model_lab/CLAUDE.md`.
 
 ## Files
 
@@ -49,7 +74,7 @@ Layout: `cli/` (argparse surface) → `pipeline.py`, `pilot.py` and feature modu
 | Start_Project_Prompt.md | Full project creation/testing/readiness execution prompt |
 | Sources.md | Verified setup facts and important channel-policy limitation |
 
-`Memory.md` is intentionally absent. The Boss creates it when coding starts and records only verified progress. Use that one case-sensitive filename on Linux. Developer memory is separate from the product's customer memory feature.
+`Memory.md` is protected historical state. Do not delete, replace or edit it without explicit owner authorization.
 
 ## Fixed decisions and provisional choices
 

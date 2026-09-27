@@ -27,6 +27,13 @@ and repo-wide rules; this file is package-local detail only.
 | `ingestion.py` · `promptfoo.py` | external result import with quarantine · Promptfoo fixture boundary |
 | `pilot.py` · `operator_input.py` · `constraints.py` | live-pilot plan/authorization · operator YAML → immutable plan · constraint map |
 | `post_pilot.py` | post-pilot gates: cost reconciliation, holdout, calibration, shadow replay |
+| `cli/optimization.py` | Offline telemetry/curation/rewards/router/harness/verifier/policy/artifact operator subcommands; argparse extension of the existing CLI |
+| `telemetry/` · `datasets.py` | Sanitized batch validation/privacy/quarantine/novelty; frozen core and lineage-aware train/validation/sealed holdout |
+| `storage/evidence.py` · `schema_registry.py` | Append-only optimization records and explicit audited state transitions; stable schema versions |
+| `rewards/` · `preferences/` | Versioned component rewards; correction classification, human review and gated preference export |
+| `optimization/router/` · `optimization/harness/` | Logged-propensity datasets, LinUCB/OPE/replay; immutable prompt candidates and simulated optimizer |
+| `verifier.py` · `artifacts/` | Hard-gate decisions, reproducibility, tier budgets; read-only checksummed and Ed25519-signed PolicyBundleV1 |
+| `application/optimization_console.py` · `application/optimization_report.py` | Read-only operator projections, audited review, escaped Evidence/Analysis/Decision report |
 
 ## Dependency direction
 
@@ -51,6 +58,10 @@ function-locally in `pilot._provider_for` so offline paths never load it.
 | Router only ever drafts recommendations, never writes them | `routing.py`, `post_pilot.py` | `tests/test_post_pilot.py` |
 | Run events are append-only and credential-redacted before storage | `storage/sqlite.py`, `application/events.py` | `tests/test_observability_events.py` |
 | The TUI has no paid/live dispatch path (preflight uses `allow_paid=False`) | `application/lab_actions.py`, `tui/app.py` | `tests/test_tui_console.py` |
+| Telemetry remains quarantined until named, reasoned promotion; no core benchmark mutation | `telemetry/`, `datasets.py`, `storage/evidence.py` | `tests/test_telemetry_import.py`, `tests/test_telemetry_curation.py`, `tests/test_flywheel.py` |
+| Unsupported OPE, dirty provenance, unknown budgets or unreviewed rubric holdout fail closed | `verifier.py` | `tests/test_ope_gates.py`, `tests/test_flywheel.py` |
+| Bundle import never activates a production policy; signing keys stay outside the repository | `artifacts/`, `contracts/karmi_reference/loader.py` | `tests/test_optimization_foundation.py`, `tests/test_flywheel.py` |
+| Optimization HTML/Markdown escapes untrusted gate/telemetry text | `application/optimization_report.py` | `tests/test_optimization_report.py` |
 
 ## Extending
 

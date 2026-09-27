@@ -181,3 +181,9 @@ Manual walkthrough:
 9. Only after paid authorization, run a small budgeted live pilot and reconcile provider-reported usage against the local ledger. Treat this as a separate evidence gate.
 
 Done means this complete import → validate → grade → human review → compare → report → draft recommendation flow works with the supplied cases and reproducible synthetic fixtures. Provider comparisons remain unverified until actual comparable model runs exist.
+
+## Offline optimization extension (implemented fixture lane)
+
+The original proposed command examples above remain historical acceptance targets. The current CLI is `python -m model_lab --help`, with executable optimization commands and synthetic walkthrough in `README.md`. `contracts/README.md` describes the versioned Karmi transfer schema and reference shadow loader. Telemetry is privacy-validated, idempotent and quarantined before an audited role transition; it never appends to the 60-case core. Versioned reward components feed a logged-propensity LinUCB dataset; OPE exposes confidence/support limitations instead of presenting counterfactual estimates as measured fact. The verifier checks core regression, validation/holdout, tier envelopes, provenance and reproducibility before a named approval can export a signed read-only bundle.
+
+The simulated fixture demonstrates the offline loop only. Real Karmi producer/consumer integration, owner-approved tier ceilings, live model evidence, and core rubric-only holdout human review are separate unsatisfied release gates. No automatic production activation, DPO/PEFT training or paid run is part of this extension. `MANUAL_TESTING.md` covers the operator TUI and blocked manual gates.

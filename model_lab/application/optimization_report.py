@@ -13,7 +13,12 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
-from model_lab.application.reporting import _markdown_label_escape as md
+from model_lab.application.reporting import _markdown_label_escape as _markdown_escape
+
+
+def md(value: Any) -> str:
+    """Escape untrusted text even inside Markdown code spans."""
+    return _markdown_escape(value).replace("`", "&#96;")
 
 
 def _fmt(value: Any) -> str:

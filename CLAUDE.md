@@ -7,10 +7,7 @@ to keep sessions scoped and cheap: read only what the current task needs.
 
 ### Repository shape — two workstreams, don't conflate them
 
-1. **ModelLab** (`model_lab/`) — a small, offline-first Python CLI that runs
-   reproducible LLM evaluations. **Built, tested, audited.** This is the only
-   code that compiles, imports, or runs. Work here needs only this file plus
-   `model_lab/CLAUDE.md`.
+1. **ModelLab and offline optimization** (`model_lab/`, `contracts/`) — built, tested offline Python CLI/TUI for frozen evaluation, telemetry quarantine, reward evidence, LinUCB/OPE, verifier and signed shadow-candidate artifacts. Simulated fixture results are not real-provider or Karmi production evidence. Work here needs this file plus `model_lab/CLAUDE.md` and `contracts/README.md`.
 2. **Daily AI Agent product spec** (`PRD.md`, `Architecture.md`, `Design.md`,
    `Tier_Entitlements.md`, `Phases.md`, `Rules.md`, `Sources.md`,
    `Start_Project_Prompt.md`) — planning documents for a WhatsApp assistant
@@ -47,6 +44,7 @@ prefix — only local shells with a pre-existing `.venv` do.
 | `tests/` | pytest suite, one file per behavior area, mirrors `model_lab/` modules. |
 | `benchmarks/` | Frozen seed cases + grading rubrics. Treat as read-only evidence. |
 | `docs/audit/` | Completed audit trail (`FINDINGS.md`, `AUDIT_REPORT.md`). Reference, don't re-run from scratch — check `FINDINGS.md` status before re-investigating something. |
+| `contracts/` | Versioned TelemetryBatchV1 / PolicyBundleV1 transfer schemas and Karmi reference loader fixture; see `contracts/README.md`. |
 | `docs/handoffs/`, `docs/tasks/` | Evidence from the separate Codex/Zed worker workflow (see `Agent_Team.md`). Read for context; do not edit — they are append-only records. |
 | `lab-data/` | Disposable run output (gitignored). |
 
@@ -76,12 +74,11 @@ pre-tool-use hook, not just a convention.
 - Never `git push --force`, `git reset --hard`, `git clean`, or
   `git checkout -- .` (blocked in `.claude/settings.json`; ask the user
   instead).
-- This repo has an active branch (`codex/production-readiness`) with a
-  parallel Codex-driven PR workflow (`Agent_Team.md`) that owns specific
-  files per task card. Check `git status`/`git diff` before editing a file
-  that might already be mid-flight there.
+- Another Codex/Zed workflow may own separate worktrees (`Agent_Team.md`).
+  Check `git status`/`git diff` before editing shared files.
 - Local commits of reviewed, verified work are fine (one logical change per
-  commit); never push — the user controls when work leaves the machine.
+  commit). Pushing requires the owner's explicit direction; this guide is not
+  push authorization.
 
 ### Multi-agent workflow
 
