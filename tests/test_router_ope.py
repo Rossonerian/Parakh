@@ -50,8 +50,8 @@ def test_ope_evaluates_candidates():
     rep_cheap = evaluate(cheap_policy, examples, bootstrap=10)
     logging = on_policy_value(examples, bootstrap=10)
     
-    assert rep_cand["snips"] > logging["mean"], f"Candidate SNIPS {rep_cand['snips']} not > logging {logging['mean']}"
-    assert rep_cheap["snips"] < logging["mean"], f"Cheapest SNIPS {rep_cheap['snips']} not < logging {logging['mean']}"
+    assert rep_cand["snips"] > logging["value"], f"Candidate SNIPS {rep_cand['snips']} not > logging {logging['value']}"
+    assert rep_cheap["snips"] < logging["value"], f"Cheapest SNIPS {rep_cheap['snips']} not < logging {logging['value']}"
     
     # compute true value for candidate
     # The true expected value over evaluation contexts

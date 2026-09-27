@@ -12,28 +12,25 @@ from model_lab.optimization.router.linucb import fit
 from model_lab.optimization.router.features import feature_schema
 
 
-def _bootstrap_ci(values, weights, seed, bootstrap) -> tuple[float, float]:
-    n = len(values)
-    if n == 0:
-        return 0.0, 0.0
+def _bootstrap_ci(values, weights, seed, bootstrap) -> tuple[float | None, float | None]:
+    if not values or bootstrap <= 0:
+        return None, None
     rnd = random.Random(seed)
-    
-    snips_estimates = []
+    estimates = []
     for _ in range(bootstrap):
         sum_w = 0.0
         sum_wr = 0.0
-        for _ in range(n):
-            i = rnd.randrange(n)
+        for _ in range(len(values)):
+            i = rnd.randrange(len(values))
             w = weights[i]
-            r = values[i]
             sum_w += w
-            sum_wr += w * r
-        snips_estimates.append(sum_wr / sum_w if sum_w > 0 else 0.0)
-        
-    snips_estimates.sort()
-    lower = snips_estimates[int(bootstrap * 0.025)]
-    upper = snips_estimates[int(bootstrap * 0.975)]
-    return lower, upper
+            sum_wr += w * values[i]
+        if sum_w > 0:
+            estimates.append(sum_wr / sum_w)
+    if not estimates:
+        return None, None
+    estimates.sort()
+    return estimates[int((len(estimates) - 1) * 0.025)], estimates[int((len(estimates) - 1) * 0.975)]
 
 
 def evaluate(
@@ -50,12 +47,9 @@ def evaluate(
     n = len(examples)
     if n == 0:
         return {
-            "n": 0, "ips": 0.0, "snips": 0.0, "dm": 0.0, "dr": 0.0,
-            "ess": 0.0, "support": 0.0, "max_weight": 0.0, "share_weights_above_10": 0.0,
-            "ci_lower": 0.0, "ci_upper": 0.0,
-            "expected_cost": 0.0, "expected_latency": 0.0, "success_rate": 0.0, "critical_failure_rate": 0.0,
-            "action_distribution": {},
-            "warnings": ["empty"], "reliable": False
+            "n": 0, "ips": None, "snips": None, "dm": None, "dr": None, "ess": None, "support": None, "max_weight": None,
+            "share_weights_above_10": None, "bootstrap_ci": [None, None], "expected_cost": None, "expected_latency": None,
+            "success_rate": None, "critical_failure_rate": None, "action_distribution": {}, "warnings": ["empty"], "reliable": False,
         }
 
     logged_actions = set(ex["action"] for ex in examples)
@@ -144,7 +138,7 @@ def evaluate(
                     field_w_sums[field] += w_i
 
     ips = sum_wr / n
-    snips = sum_wr / sum_w if sum_w > 0 else 0.0
+    snips = sum_wr / sum_w if sum_w > 0 else None  # target puts no mass on any logged action
     dm = sum_dm / n
     dr = sum_dr / n
     ess = (sum_w * sum_w) / sum_w2 if sum_w2 > 0 else 0.0
@@ -153,6 +147,10 @@ def evaluate(
     ci_lower, ci_upper = _bootstrap_ci(rewards, weights, seed, bootstrap)
     
     warnings = []
+    if sum_w == 0:
+        warnings.append("no_logged_action_overlap")
+    if ci_lower is None:
+        warnings.append("bootstrap_no_support")
     if ess < min_ess:
         warnings.append("low_effective_sample_size")
     if support < min_support:
@@ -192,17 +190,10 @@ def evaluate(
     }
 
 def on_policy_value(examples: Sequence[dict[str, Any]], *, seed: int = 0, bootstrap: int = 500) -> dict[str, Any]:
+    """Value of the logging policy on its own data: the plain mean reward (exact, no weighting)."""
     n = len(examples)
     if n == 0:
-        return {"mean": 0.0, "bootstrap_ci": [0.0, 0.0]}
-    
+        return {"n": 0, "value": None, "bootstrap_ci": [None, None]}
     rewards = [ex["reward"] for ex in examples]
-    weights = [1.0] * n
-    
-    mean = sum(rewards) / n
-    ci_lower, ci_upper = _bootstrap_ci(rewards, weights, seed, bootstrap)
-    
-    return {
-        "mean": mean,
-        "bootstrap_ci": [ci_lower, ci_upper]
-    }
+    ci_lower, ci_upper = _bootstrap_ci(rewards, [1.0] * n, seed, bootstrap)
+    return {"n": n, "value": sum(rewards) / n, "bootstrap_ci": [ci_lower, ci_upper]}

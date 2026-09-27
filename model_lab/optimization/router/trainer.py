@@ -26,7 +26,7 @@ def train_candidate(
     
     # metrics computation
     train_count = len(train_examples)
-    train_mean_reward = sum(ex["reward"] for ex in train_examples) / train_count if train_count > 0 else 0.0
+    train_mean_reward = sum(ex["reward"] for ex in train_examples) / train_count if train_count > 0 else None
     
     # fit
     model = fit(
@@ -101,32 +101,27 @@ def reproduce(evidence, training_id: str) -> dict[str, Any]:
     policy_doc = to_policy_document(model)
     parameters_checksum = stable_hash(policy_doc)
     
-    parameters_checksum_match = (parameters_checksum == run["parameters_checksum"])
-    
-    # We should also compare candidates directly but the run has parameters_checksum.
-    # To get the original policy document, we can find the candidate that points to this training_id.
+    parameters_checksum_match = parameters_checksum == run["parameters_checksum"]
     candidates = evidence.list("policy_candidates", training_id=training_id)
-    if not candidates:
-        # Fallback to true if we just match checksum?
-        # The prompt says: compare every theta/a_inv entry within 1e-12.
-        pass
-        
-    candidate = candidates[0] if candidates else None
+    if len(candidates) != 1:
+        return {"reproducible": False, "max_abs_diff": None, "parameters_checksum_match": parameters_checksum_match}
+    original = candidates[0]["policy"]
+    if set(original["parameters"]) != set(model.parameters):
+        return {"reproducible": False, "max_abs_diff": None, "parameters_checksum_match": parameters_checksum_match}
     max_abs_diff = 0.0
-    
-    if candidate:
-        orig_doc = candidate["policy"]
-        for a, p in orig_doc["parameters"].items():
-            if a in model.parameters:
-                new_p = model.parameters[a]
-                for i in range(len(p["theta"])):
-                    max_abs_diff = max(max_abs_diff, abs(p["theta"][i] - new_p["theta"][i]))
-                for i in range(len(p["a_inv"])):
-                    for j in range(len(p["a_inv"][i])):
-                        max_abs_diff = max(max_abs_diff, abs(p["a_inv"][i][j] - new_p["a_inv"][i][j]))
-                        
+    for action, stored in original["parameters"].items():
+        current = model.parameters[action]
+        if len(stored["theta"]) != len(current["theta"]) or len(stored["a_inv"]) != len(current["a_inv"]):
+            return {"reproducible": False, "max_abs_diff": None, "parameters_checksum_match": parameters_checksum_match}
+        for x, y in zip(stored["theta"], current["theta"], strict=True):
+            max_abs_diff = max(max_abs_diff, abs(x - y))
+        for row_x, row_y in zip(stored["a_inv"], current["a_inv"], strict=True):
+            if len(row_x) != len(row_y):
+                return {"reproducible": False, "max_abs_diff": None, "parameters_checksum_match": parameters_checksum_match}
+            for x, y in zip(row_x, row_y, strict=True):
+                max_abs_diff = max(max_abs_diff, abs(x - y))
     return {
-        "reproducible": parameters_checksum_match and (max_abs_diff < 1e-12),
-        "max_abs_diff": float(max_abs_diff),
-        "parameters_checksum_match": parameters_checksum_match
+        "reproducible": parameters_checksum_match and max_abs_diff < 1e-12,
+        "max_abs_diff": max_abs_diff,
+        "parameters_checksum_match": parameters_checksum_match,
     }
