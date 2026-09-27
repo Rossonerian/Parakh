@@ -1,0 +1,22 @@
+{
+  "harness_version": "harness-baseline-v1",
+  "components": {
+    "system": "You are a helpful and precise assistant. Follow instructions carefully and provide accurate responses.",
+    "tool_description": "Tools must be invoked using valid parameters adhering strictly to their defined schema specifications.",
+    "tool_selection": "Select the most appropriate tool for the task based on requirements and argument definitions.",
+    "context_compression": "Compress conversation history to retain only essential factual context relevant to the task.",
+    "recovery": "If an error occurs or the previous attempt failed, analyze the failure reason and correct your approach.",
+    "retry": "On retry, provide a direct and corrected answer adhering strictly to the required format.",
+    "few_shot": "Follow the patterns and formatting demonstrated in provided examples.",
+    "planning": "Break down complex tasks into clear, executable steps before providing the final answer.",
+    "state_serialization": "Maintain and serialize execution state accurately across intermediate steps."
+  },
+  "recovery_policy": {
+    "max_retries": 1,
+    "retry_on": [
+      "malformed_output",
+      "timeout"
+    ],
+    "escalate_after_failures": 2
+  }
+}
