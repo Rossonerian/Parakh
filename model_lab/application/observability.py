@@ -350,7 +350,7 @@ def provider_statuses(runs: list[RunSummary]) -> list[ProviderStatus]:
 def environment_checks(suite_path: str | Path) -> dict[str, Any]:
     """The `model-lab doctor` checks (offline readiness)."""
     path = Path(suite_path)
-    checks: dict[str, Any] = {"python_3_12_plus": sys.version_info >= (3, 12), "benchmark_present": path.is_file()}
+    checks: dict[str, Any] = {"python_3_11_plus": sys.version_info >= (3, 11), "benchmark_present": path.is_file()}
     if checks["benchmark_present"]:
         checks["benchmark_cases"] = validate_suite(load_suite(path))["cases"]
     checks["offline_ready"] = all(value is True for key, value in checks.items() if key != "benchmark_cases") and checks.get("benchmark_cases") == 60

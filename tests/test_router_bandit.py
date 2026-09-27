@@ -164,7 +164,6 @@ def test_probabilities_sum_and_eligible():
         adv_params[a]["theta"] = [1e6] * f_schema["dimension"]
         adv_params[a]["a_inv"][0][0] = 1e6
         
-    model = copy.replace(model, parameters=adv_params) # wait, dataclasses.replace is in dataclasses
     from dataclasses import replace
     model = replace(model, parameters=adv_params)
     
@@ -173,8 +172,7 @@ def test_probabilities_sum_and_eligible():
     actions = list(dataset.metadata["actions"])
     
     for _ in range(50):
-        # random eligible subset
-        eligible = random.sample(actions, k=rng.randint(1, len(actions)))
+        eligible = rng.sample(actions, k=rng.randint(1, len(actions)))
         x = [rng.random() for _ in range(f_schema["dimension"])]
         
         probs = model.probabilities(x, eligible)

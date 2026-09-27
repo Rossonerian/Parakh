@@ -12,7 +12,7 @@ Prepared 2026-09-09 for a WhatsApp-first assistant with four subscriptions and f
 
 ## ModelLab and offline optimization engine
 
-`model_lab/` is a working offline-first Python ≥3.12 evaluation lab with a versioned optimization lane. The console requires the `tui` extra; the Daily AI Agent product remains specification-only. No live Karmi integration or paid-provider measurements are implied.
+`model_lab/` is a working offline-first Python ≥3.11 evaluation lab with a versioned optimization lane. The console requires the `tui` extra; the Daily AI Agent product remains specification-only. No live Karmi integration or paid-provider measurements are implied.
 ```bash
 python -m venv .venv && .venv/bin/pip install -e '.[dev]'   # pytest, ruff, textual
 make PYTHON=.venv/bin/python tui            # interactive console; starts the offline DEMO on an empty workspace

@@ -22,7 +22,7 @@ die() { echo "parakh: $*" >&2; exit 1; }
 ensure_env() {
     if [[ ! -x "$PY" ]]; then
         echo "parakh: creating $REPO/.venv" >&2
-        python3 -m venv "$REPO/.venv" || die "python3 -m venv failed (need Python >= 3.12)"
+        python3 -m venv "$REPO/.venv" || die "python3 -m venv failed (need Python >= 3.11)"
     fi
     if ! "$PY" -c 'import textual' 2>/dev/null; then
         echo "parakh: installing ModelLab with the tui extra" >&2

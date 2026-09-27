@@ -565,8 +565,10 @@ class PolicyView(VerticalScroll):
             return
         shadow = metrics.get("shadow_disagreement") or {}
         recovery = metrics.get("first_shot_recovery") or {}
+        shadow_text = ", ".join(f"{version}: {fmt.pct(stats['rate'])} of {stats['n']}"
+                                for version, stats in shadow.items())
         self.query_one("#policy-metrics", Panel).update(
-            f"shadow disagreement  {fmt.text(', '.join(f'{v}: {fmt.pct(s['rate'])} of {s['n']}' for v, s in shadow.items()), 'no shadow evidence yet')}\n"
+            f"shadow disagreement  {fmt.text(shadow_text, 'no shadow evidence yet')}\n"
             f"critical regression rate  {fmt.pct((metrics.get('critical_regression_rate') or {}).get('value'))}\n"
             f"propensity support coverage  {fmt.pct((metrics.get('propensity_support_coverage') or {}).get('value'))}\n"
             f"first-shot success {fmt.pct(recovery.get('first_shot_success_rate'))} · unrecovered failures {fmt.pct(recovery.get('unrecovered_failure_rate'))} · "
