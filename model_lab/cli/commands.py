@@ -9,14 +9,22 @@ import sys
 
 from model_lab.application.execution import ExecutionEngine
 from model_lab.application.reporting import write_report_bundle
+from model_lab.artifacts.bundle import export as export_bundle, verify as verify_bundle
+from model_lab.artifacts.provenance import git_state
+from model_lab.artifacts.signer import generate_key, load_private
 from model_lab.benchmark import export_candidate_jsonl, load_suite, validate_suite
 from model_lab.analysis import compare_grades
 from model_lab.application.observability import environment_checks
 from model_lab.constraints import evaluate_constraints, file_sha256, load_constraint_map
-from model_lab.errors import IntegrityError, ModelLabError, ValidationError
+from model_lab.errors import IntegrityError, ModelLabError, NotFoundError, ValidationError
 from model_lab.grading import grade_attempt
 from model_lab.ingestion import ingest_file
 from model_lab.operator_input import build_immutable_plan, load_operator_input, validate_operator_input, write_immutable_plan
+from model_lab.optimization.router.dataset import build_dataset, load_dataset, persist_dataset
+from model_lab.optimization.router.linucb import from_policy_document
+from model_lab.optimization.router.off_policy import evaluate as evaluate_policy
+from model_lab.optimization.router.policies import LinUCBPolicy
+from model_lab.optimization.router.trainer import train_candidate
 from model_lab.pipeline import run_offline_demo
 from model_lab.pilot import (
     build_pilot_plan,
@@ -30,8 +38,16 @@ from model_lab.pilot import (
 from model_lab.promptfoo import export_promptfoo_manifest, import_promptfoo_fixture
 from model_lab.providers.fake import FakeProvider
 from model_lab.review import export_blind_review, import_blind_reviews, review_bindings
-from model_lab.schemas import Budget, ModelConfig, Run, utc_now
+from model_lab.rewards.composite import persist as persist_reward, reward_for_attempt, reward_for_run
+from model_lab.rewards.schema import RewardConfig
+from model_lab.schema_registry import FEATURE_SCHEMA_VERSION, REWARD_SCHEMA_VERSION
+from model_lab.schemas import Budget, HumanReview, ModelConfig, Run, utc_now
 from model_lab.storage import SQLiteStore
+from model_lab.storage.evidence import CANDIDATE_ROLES, EvidenceStore
+from model_lab.telemetry.curation import approve as approve_candidate, list_candidates, reject as reject_candidate
+from model_lab.telemetry.importer import import_batch
+from model_lab.telemetry.schema import RunRecord, parse_run
+from model_lab.verifier import approve as approve_policy, verify as verify_candidate
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -171,6 +187,95 @@ def build_parser() -> argparse.ArgumentParser:
     recommend.add_argument("--out")
     recommend.add_argument("--draft", action="store_true", default=False)
     recommend.add_argument("--constraint-map", default="docs/live_pilots/router-constraint-map-v0.2.0.json")
+
+    router_dataset = router_sub.add_parser("dataset", help="generate and persist router training dataset")
+    router_dataset.add_argument("--db", required=True, help="path to SQLite database file")
+    router_dataset.add_argument("--seed", type=int, required=True, help="random seed for dataset split")
+    router_dataset.add_argument("--import-id", help="optional import ID filter")
+    router_dataset.add_argument("--out", help="optional output path for dataset summary JSON")
+
+    router_train = router_sub.add_parser("train", help="train a router policy candidate on a dataset")
+    router_train.add_argument("dataset_id", help="dataset ID")
+    router_train.add_argument("--db", required=True, help="path to SQLite database file")
+    router_train.add_argument("--seed", type=int, required=True, help="random seed for training")
+    router_train.add_argument("--alpha", type=float, default=0.5, help="LinUCB exploration parameter (default: 0.5)")
+    router_train.add_argument("--lambda", type=float, default=1.0, dest="lambda_", help="L2 regularization (default: 1.0)")
+    router_train.add_argument("--epsilon", type=float, default=0.05, help="random exploration probability (default: 0.05)")
+    router_train.add_argument("--out", help="optional output path for training result JSON")
+
+    router_eval = router_sub.add_parser("evaluate", help="evaluate a router candidate on validation split (validation OPE)")
+    router_eval.add_argument("candidate_id", help="policy candidate ID")
+    router_eval.add_argument("--db", required=True, help="path to SQLite database file")
+    router_eval.add_argument("--seed", type=int, default=0, help="random seed for evaluation bootstrap (default: 0)")
+    router_eval.add_argument("--out", help="optional output path for evaluation report JSON")
+
+    telemetry = sub.add_parser("telemetry", help="intake and manage Karmi telemetry")
+    telemetry_sub = telemetry.add_subparsers(dest="telemetry_command", required=True)
+    telemetry_import = telemetry_sub.add_parser("import", help="import a TelemetryBatchV1 JSON file")
+    telemetry_import.add_argument("batch", help="path to batch JSON file")
+    telemetry_import.add_argument("--db", required=True, help="path to SQLite database file")
+    telemetry_import.add_argument("--source-label", default="karmi", help="source label for telemetry batch (default: karmi)")
+
+    candidates = sub.add_parser("candidates", help="curate and manage evaluation candidates")
+    candidates_sub = candidates.add_subparsers(dest="candidates_command", required=True)
+    candidates_list = candidates_sub.add_parser("list", help="list candidates with lifecycle states")
+    candidates_list.add_argument("--db", required=True, help="path to SQLite database file")
+    candidates_list.add_argument("--state", help="filter candidates by state")
+    candidates_approve = candidates_sub.add_parser("approve", help="approve candidate into an evaluation role")
+    candidates_approve.add_argument("candidate_id", help="candidate ID")
+    candidates_approve.add_argument("--db", required=True, help="path to SQLite database file")
+    candidates_approve.add_argument("--role", default="TRAIN_ONLY", choices=CANDIDATE_ROLES, help="evaluation role (default: TRAIN_ONLY)")
+    candidates_approve.add_argument("--actor", required=True, help="named operator approving the candidate")
+    candidates_approve.add_argument("--reason", required=True, help="reason for candidate approval")
+    candidates_reject = candidates_sub.add_parser("reject", help="reject an evaluation candidate")
+    candidates_reject.add_argument("candidate_id", help="candidate ID")
+    candidates_reject.add_argument("--db", required=True, help="path to SQLite database file")
+    candidates_reject.add_argument("--actor", required=True, help="named operator rejecting the candidate")
+    candidates_reject.add_argument("--reason", required=True, help="reason for candidate rejection")
+
+    reward = sub.add_parser("reward", help="compute multi-objective rewards")
+    reward_sub = reward.add_subparsers(dest="reward_command", required=True)
+    reward_compute = reward_sub.add_parser("compute", help="compute and persist reward for a run")
+    reward_compute.add_argument("run_id", help="telemetry or benchmark run ID")
+    reward_compute.add_argument("--db", required=True, help="path to SQLite database file")
+    reward_compute.add_argument("--correction-category", help="optional user signal correction category")
+
+    verify_cmd = sub.add_parser("verify", help="run candidate promotion verifier gates")
+    verify_cmd.add_argument("candidate_id", help="policy candidate ID")
+    verify_cmd.add_argument("--db", required=True, help="path to SQLite database file")
+    verify_cmd.add_argument("--benchmark-runs", required=True, help="JSON string or path to JSON file mapping action to benchmark run ID")
+    verify_cmd.add_argument("--out", help="optional output path for verification report JSON")
+
+    policy_cmd = sub.add_parser("policy", help="policy candidate lifecycle management")
+    policy_sub = policy_cmd.add_subparsers(dest="policy_command", required=True)
+    policy_approve = policy_sub.add_parser("approve", help="approve a verified policy candidate")
+    policy_approve.add_argument("candidate_id", help="policy candidate ID")
+    policy_approve.add_argument("--db", required=True, help="path to SQLite database file")
+    policy_approve.add_argument("--actor", required=True, help="named operator approving the policy candidate")
+    policy_approve.add_argument("--reason", required=True, help="reason for approval")
+    policy_approve.add_argument("--out", help="optional output path for approval result JSON")
+    policy_verify = policy_sub.add_parser("verify", help="run candidate promotion verifier gates")
+    policy_verify.add_argument("candidate_id", help="policy candidate ID")
+    policy_verify.add_argument("--db", required=True, help="path to SQLite database file")
+    policy_verify.add_argument("--benchmark-runs", required=True, help="JSON string or path to JSON file mapping action to benchmark run ID")
+    policy_verify.add_argument("--out", help="optional output path for verification report JSON")
+
+    artifact = sub.add_parser("artifact", help="cryptographic signing and export of policy bundles")
+    artifact_sub = artifact.add_subparsers(dest="artifact_command", required=True)
+    artifact_keygen = artifact_sub.add_parser("keygen", help="generate a new Ed25519 signing key")
+    artifact_keygen.add_argument("--path", help="path to private key file")
+    artifact_keygen.add_argument("--out", help="optional output path for key information JSON")
+    artifact_export = artifact_sub.add_parser("export", help="export a signed PolicyBundleV1")
+    artifact_export.add_argument("candidate_id", help="policy candidate ID")
+    artifact_export.add_argument("--db", required=True, help="path to SQLite database file")
+    artifact_export.add_argument("--out", required=True, help="output directory for the exported bundle")
+    artifact_export.add_argument("--key-path", required=True, help="path to private key file")
+    artifact_export.add_argument("--actor", required=True, help="named operator exporting the candidate")
+    artifact_export.add_argument("--previous-compatible-version", help="previous compatible artifact version")
+    artifact_verify = artifact_sub.add_parser("verify", help="verify a signed PolicyBundleV1")
+    artifact_verify.add_argument("path", help="path to exported bundle directory")
+    artifact_verify.add_argument("--trusted-public-key", required=True, help="trusted public key hex")
+    artifact_verify.add_argument("--out", help="optional output path for verification result JSON")
     return parser
 
 
@@ -368,24 +473,331 @@ def main(argv: list[str] | None = None) -> int:
             finally:
                 store.close()
             return 0
-        if args.command == "router" and args.router_command == "recommend":
-            if not args.draft:
-                raise ModelLabError("routing recommendations require explicit --draft acknowledgement")
-            source = Path(args.summary)
-            value = json.loads(source.read_text(encoding="utf-8"))
-            recommendations = value.get("routing_recommendations", [])
-            constraint_map = load_constraint_map(args.constraint_map)
-            constraint_evaluation = evaluate_constraints(constraint_map)
-            constraint_evaluation["source_manifest_sha256"] = constraint_map.get("source_manifest_sha256")
-            constraint_evaluation["constraint_map_sha256"] = file_sha256(args.constraint_map)
-            activation_ready = bool(constraint_evaluation["activation_ready"]) and not any(item.get("synthetic") for item in recommendations)
-            result = {"draft": True, "activation_ready": activation_ready, "recommendations": recommendations,
-                      "constraint_evaluation": constraint_evaluation, "production_config_changed": False,
-                      "limitations": ["Draft evidence cannot activate production routing."]}
-            if args.out:
-                _write_json(args.out, result)
-            _print_json(result)
-            return 0 if activation_ready else 2
+        if args.command == "telemetry":
+            if args.telemetry_command == "import":
+                store = SQLiteStore(args.db)
+                try:
+                    res = import_batch(store, args.batch, source_label=args.source_label)
+                    output = {
+                        "import_id": res.import_id,
+                        "batch_id": res.batch_id,
+                        "status": res.status,
+                        "accepted": res.accepted,
+                        "quarantined": res.quarantined,
+                        "observations": res.observations,
+                        "candidates": res.candidates,
+                        "duplicates_marked": res.duplicates_marked,
+                    }
+                    _print_json(output)
+                    return 0
+                finally:
+                    store.close()
+        if args.command == "candidates":
+            store = SQLiteStore(args.db)
+            try:
+                evidence = EvidenceStore(store)
+                if args.candidates_command == "list":
+                    cands = list_candidates(evidence, state=getattr(args, "state", None))
+                    _print_json(cands)
+                    return 0
+                actor = (getattr(args, "actor", "") or "").strip()
+                reason = (getattr(args, "reason", "") or "").strip()
+                if not actor:
+                    raise ValidationError("operator action requires non-blank named actor")
+                if not reason:
+                    raise ValidationError("operator action requires non-blank reason")
+                if args.candidates_command == "approve":
+                    role = getattr(args, "role", "TRAIN_ONLY") or "TRAIN_ONLY"
+                    res = approve_candidate(evidence, args.candidate_id, role, actor=actor, reason=reason)
+                    _print_json(res)
+                    return 0
+                if args.candidates_command == "reject":
+                    res = reject_candidate(evidence, args.candidate_id, actor=actor, reason=reason)
+                    _print_json(res)
+                    return 0
+            finally:
+                store.close()
+        if args.command == "reward" and args.reward_command == "compute":
+            store = SQLiteStore(args.db)
+            try:
+                evidence = EvidenceStore(store)
+                telemetry_records = evidence.list("telemetry_records", run_id=args.run_id)
+                if telemetry_records:
+                    accepted = [r for r in telemetry_records if r.get("status") == "accepted"]
+                    if not accepted:
+                        raise ValidationError(f"telemetry run {args.run_id} is quarantined or rejected")
+                    raw_run = accepted[0]["record"]
+                    feature_schema = raw_run.get("feature_schema_version", FEATURE_SCHEMA_VERSION)
+                    parsed_run = parse_run(raw_run, 0, feature_schema)
+                    if not isinstance(parsed_run, RunRecord):
+                        raise ValidationError(f"invalid telemetry run record {args.run_id}: {parsed_run.reasons}")
+                    config = RewardConfig()
+                    reward_record = reward_for_run(parsed_run, config, correction_category=getattr(args, "correction_category", None))
+                    persist_reward(evidence, reward_record)
+                    _print_json(reward_record.to_dict())
+                    return 0
+                if args.run_id.startswith("imp-"):
+                    import_runs = evidence.list("telemetry_records", import_id=args.run_id, status="accepted")
+                    if import_runs:
+                        config = RewardConfig()
+                        computed_list = []
+                        for rec in import_runs:
+                            raw_run = rec["record"]
+                            feature_schema = raw_run.get("feature_schema_version", FEATURE_SCHEMA_VERSION)
+                            parsed_run = parse_run(raw_run, 0, feature_schema)
+                            if isinstance(parsed_run, RunRecord):
+                                rew = reward_for_run(parsed_run, config, correction_category=getattr(args, "correction_category", None))
+                                persist_reward(evidence, rew)
+                                computed_list.append(rew.to_dict())
+                        _print_json({"import_id": args.run_id, "computed": len(computed_list), "rewards": computed_list})
+                        return 0
+                if args.run_id == "all":
+                    all_runs = evidence.list("telemetry_records", status="accepted")
+                    if not all_runs:
+                        raise NotFoundError("no accepted telemetry runs found")
+                    config = RewardConfig()
+                    computed_list = []
+                    for rec in all_runs:
+                        raw_run = rec["record"]
+                        feature_schema = raw_run.get("feature_schema_version", FEATURE_SCHEMA_VERSION)
+                        parsed_run = parse_run(raw_run, 0, feature_schema)
+                        if isinstance(parsed_run, RunRecord):
+                            rew = reward_for_run(parsed_run, config, correction_category=getattr(args, "correction_category", None))
+                            persist_reward(evidence, rew)
+                            computed_list.append(rew.to_dict())
+                    _print_json({"computed": len(computed_list), "rewards": computed_list})
+                    return 0
+                try:
+                    store.get_run(args.run_id)
+                except Exception:
+                    raise NotFoundError(f"unknown run ID {args.run_id}")
+                attempts = store.list_attempts(args.run_id)
+                if not attempts:
+                    raise NotFoundError(f"run {args.run_id} has no attempts")
+                grades = {g.attempt_id: g for g in store.list_grades(args.run_id)}
+                reviews = store.list_reviews(args.run_id)
+                reviews_by_case: dict[str, list[HumanReview]] = {}
+                for r in reviews:
+                    reviews_by_case.setdefault(r.case_id, []).append(r)
+                config = RewardConfig()
+                computed = []
+                for attempt in attempts:
+                    grade = grades.get(attempt.attempt_id)
+                    if grade is None:
+                        continue
+                    case_reviews = reviews_by_case.get(attempt.case_id)
+                    rec = reward_for_attempt(attempt, grade, case_reviews, config)
+                    persist_reward(evidence, rec)
+                    computed.append(rec.to_dict())
+                _print_json({"run_id": args.run_id, "computed": len(computed), "rewards": computed})
+                return 0
+            finally:
+                store.close()
+        if args.command == "router":
+            if args.router_command == "recommend":
+                if not args.draft:
+                    raise ModelLabError("routing recommendations require explicit --draft acknowledgement")
+                source = Path(args.summary)
+                value = json.loads(source.read_text(encoding="utf-8"))
+                recommendations = value.get("routing_recommendations", [])
+                constraint_map = load_constraint_map(args.constraint_map)
+                constraint_evaluation = evaluate_constraints(constraint_map)
+                constraint_evaluation["source_manifest_sha256"] = constraint_map.get("source_manifest_sha256")
+                constraint_evaluation["constraint_map_sha256"] = file_sha256(args.constraint_map)
+                activation_ready = bool(constraint_evaluation["activation_ready"]) and not any(item.get("synthetic") for item in recommendations)
+                result = {"draft": True, "activation_ready": activation_ready, "recommendations": recommendations,
+                          "constraint_evaluation": constraint_evaluation, "production_config_changed": False,
+                          "limitations": ["Draft evidence cannot activate production routing."]}
+                if args.out:
+                    _write_json(args.out, result)
+                _print_json(result)
+                return 0 if activation_ready else 2
+            if args.router_command == "dataset":
+                store = SQLiteStore(args.db)
+                try:
+                    evidence = EvidenceStore(store)
+                    if args.import_id:
+                        observations = evidence.list("router_observations", import_id=args.import_id)
+                        import_ids = [args.import_id]
+                    else:
+                        observations = evidence.list("router_observations")
+                        import_ids = [imp["import_id"] for imp in evidence.list("telemetry_imports")]
+                    if not observations:
+                        raise ValidationError("no router observations found in database")
+                    rewards_list = evidence.list("rewards")
+                    rewards = {r["subject_id"]: r for r in rewards_list if r.get("subject_type") == "telemetry_run"}
+                    dataset = build_dataset(
+                        observations,
+                        rewards,
+                        feature_schema_version=FEATURE_SCHEMA_VERSION,
+                        reward_schema_version=REWARD_SCHEMA_VERSION,
+                        seed=args.seed,
+                        source={"import_ids": import_ids},
+                    )
+                    if not dataset.examples:
+                        raise ValidationError(f"no valid dataset examples produced (exclusions: {dataset.metadata.get('exclusions')})")
+                    persist_dataset(evidence, dataset)
+                    result = {
+                        "dataset_id": dataset.dataset_id,
+                        "checksum": dataset.checksum,
+                        "counts_by_split": dataset.metadata["counts_by_split"],
+                        "actions": dataset.metadata["actions"],
+                        "seed": args.seed,
+                        "exclusions": dataset.metadata.get("exclusions", {}),
+                    }
+                    if getattr(args, "out", None):
+                        _write_json(args.out, result)
+                    _print_json(result)
+                    return 0
+                finally:
+                    store.close()
+            if args.router_command == "train":
+                store = SQLiteStore(args.db)
+                try:
+                    evidence = EvidenceStore(store)
+                    dataset = load_dataset(evidence, args.dataset_id)
+                    train_examples = dataset.examples_for("train")
+                    if not train_examples:
+                        raise ValidationError(f"dataset {args.dataset_id} has no training examples")
+                    hyperparameters = {
+                        "alpha": args.alpha,
+                        "lambda_": args.lambda_,
+                        "epsilon": args.epsilon,
+                    }
+                    git = git_state()
+                    candidate_id, model = train_candidate(
+                        evidence,
+                        dataset,
+                        hyperparameters=hyperparameters,
+                        seed=args.seed,
+                        git=git,
+                    )
+                    result = {
+                        "candidate_id": candidate_id,
+                        "dataset_id": args.dataset_id,
+                        "seed": args.seed,
+                        "algorithm": "linucb",
+                        "actions": list(model.actions),
+                    }
+                    if getattr(args, "out", None):
+                        _write_json(args.out, result)
+                    _print_json(result)
+                    return 0
+                finally:
+                    store.close()
+            if args.router_command == "evaluate":
+                store = SQLiteStore(args.db)
+                try:
+                    evidence = EvidenceStore(store)
+                    candidate = evidence.get("policy_candidates", args.candidate_id)
+                    if candidate.get("kind") != "router":
+                        raise ValidationError(f"candidate {args.candidate_id} is kind {candidate.get('kind')}, expected router")
+                    dataset = load_dataset(evidence, candidate["dataset_id"])
+                    validation_examples = dataset.examples_for("validation")
+                    if not validation_examples:
+                        raise ValidationError(f"dataset {candidate['dataset_id']} has no validation examples")
+                    model = from_policy_document(candidate["policy"])
+                    policy = LinUCBPolicy(model)
+                    ope_report = evaluate_policy(policy, validation_examples, seed=args.seed)
+                    report_id = f"ope-{args.candidate_id[:16]}-{dataset.dataset_id[:16]}"
+                    evidence.append("ope_reports", report_id, {
+                        "report_id": report_id,
+                        "policy_candidate_id": args.candidate_id,
+                        "dataset_id": dataset.dataset_id,
+                        "split": "validation",
+                        "report": ope_report,
+                    })
+                    result = {
+                        "candidate_id": args.candidate_id,
+                        "dataset_id": dataset.dataset_id,
+                        "split": "validation",
+                        **ope_report,
+                    }
+                    if getattr(args, "out", None):
+                        _write_json(args.out, result)
+                    _print_json(result)
+                    return 0
+                finally:
+                    store.close()
+        if args.command == "verify" or (args.command == "policy" and getattr(args, "policy_command", None) == "verify"):
+            store = SQLiteStore(args.db)
+            try:
+                evidence = EvidenceStore(store)
+                if not getattr(args, "benchmark_runs", None):
+                    raise ValidationError("--benchmark-runs is required and cannot be empty")
+                runs_val = args.benchmark_runs.strip()
+                if Path(runs_val).is_file():
+                    benchmark_runs = json.loads(Path(runs_val).read_text(encoding="utf-8"))
+                else:
+                    benchmark_runs = json.loads(runs_val)
+                if not isinstance(benchmark_runs, dict) or not benchmark_runs:
+                    raise ValidationError("--benchmark-runs must be a non-empty mapping of action to run ID")
+                report = verify_candidate(evidence, args.candidate_id, benchmark_runs=benchmark_runs)
+                if getattr(args, "out", None):
+                    _write_json(args.out, report)
+                _print_json(report)
+                return 0 if report.get("passed") else 2
+            finally:
+                store.close()
+        if args.command == "policy" and args.policy_command == "approve":
+            actor = (getattr(args, "actor", "") or "").strip()
+            reason = (getattr(args, "reason", "") or "").strip()
+            if not actor:
+                raise ValidationError("operator approval requires non-blank named actor")
+            if not reason:
+                raise ValidationError("operator approval requires non-blank reason")
+            store = SQLiteStore(args.db)
+            try:
+                evidence = EvidenceStore(store)
+                res = approve_policy(evidence, args.candidate_id, actor=actor, reason=reason)
+                if getattr(args, "out", None):
+                    _write_json(args.out, res)
+                _print_json(res)
+                return 0
+            finally:
+                store.close()
+        if args.command == "artifact":
+            if args.artifact_command == "keygen":
+                res = generate_key(getattr(args, "path", None))
+                if getattr(args, "out", None):
+                    _write_json(args.out, res)
+                _print_json(res)
+                return 0
+            if args.artifact_command == "export":
+                actor = (getattr(args, "actor", "") or "").strip()
+                if not actor:
+                    raise ValidationError("artifact export requires non-blank named actor")
+                secret = load_private(args.key_path)
+                store = SQLiteStore(args.db)
+                try:
+                    evidence = EvidenceStore(store)
+                    git = git_state()
+                    record = export_bundle(
+                        evidence,
+                        args.candidate_id,
+                        out_root=args.out,
+                        secret=secret,
+                        git=git,
+                        actor=actor,
+                        previous_compatible_version=getattr(args, "previous_compatible_version", None),
+                    )
+                    _print_json(record)
+                    return 0
+                finally:
+                    store.close()
+            if args.artifact_command == "verify":
+                errors = verify_bundle(args.path, [args.trusted_public_key])
+                if errors:
+                    result = {"verified": False, "errors": errors, "path": str(args.path)}
+                    if getattr(args, "out", None):
+                        _write_json(args.out, result)
+                    _print_json(result)
+                    return 2
+                result = {"verified": True, "path": str(args.path), "trusted_public_key": args.trusted_public_key}
+                if getattr(args, "out", None):
+                    _write_json(args.out, result)
+                _print_json(result)
+                return 0
         if args.command in {"grade", "compare", "report", "audit"}:
             if args.command == "grade" and args.db and args.suite and args.run_id:
                 suite = load_suite(args.suite)
