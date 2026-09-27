@@ -21,7 +21,11 @@ dev = [
 model-lab = "model_lab.cli:main"
 
 [tool.setuptools.packages.find]
-include = ["model_lab*"]
+include = ["model_lab*", "contracts*"]
+
+[tool.setuptools.package-data]
+"model_lab.optimization.harness" = ["*.json"]
+contracts = ["*.json", "fixtures/*.json"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
