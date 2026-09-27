@@ -21,8 +21,11 @@ from typing import Any, Iterable, Mapping
 from model_lab.artifacts import ed25519, signer
 from model_lab.artifacts.provenance import build_provenance, missing_fields
 from model_lab.errors import IntegrityError, ValidationError
+from model_lab.optimization.harness import HarnessCandidate, PromptRegistry
+from model_lab.optimization.harness import bundle_files as harness_bundle_files
 from model_lab.schema_registry import ARTIFACT_SCHEMA, ARTIFACT_SCHEMA_VERSION, MINIMUM_KARMI_VERSION
 from model_lab.storage.evidence import EvidenceStore
+from model_lab.verifier import registry_for_imports
 
 CHECKSUMS = "checksums.json"
 SIGNATURE = "signature.sig"
@@ -62,14 +65,8 @@ def render(evidence: EvidenceStore, candidate_id: str, *, secret: bytes, git: Ma
     report = _latest_passing_report(evidence, candidate_id)
     training = evidence.get("policy_training_runs", candidate["training_id"])
     dataset = evidence.get("datasets", candidate["dataset_id"])
-    examples = evidence.list("dataset_examples", dataset_id=candidate["dataset_id"])
-    source_imports = (dataset.get("metadata", {}).get("source") or {}).get("import_ids", [])
-    registry: list[Mapping[str, Any]] = []
-    for import_id in source_imports:
-        for entry in evidence.get("telemetry_imports", import_id).get("model_registry", []):
-            if all((entry["provider"], entry["model"]) != (m["provider"], m["model"]) for m in registry):
-                registry.append(entry)
-    registry.sort(key=lambda m: (m["provider"], m["model"]))
+    examples = [row["example"] for row in evidence.list("dataset_examples", dataset_id=candidate["dataset_id"])]
+    registry = registry_for_imports(evidence, (dataset.get("metadata", {}).get("source") or {}).get("import_ids", []))
     approved = [h for h in evidence.history("policy_candidate", candidate_id) if h["to_state"] == "APPROVED"]
     if not approved or evidence.state("policy_candidate", candidate_id) not in ("APPROVED", "EXPORTED"):
         raise IntegrityError(f"{candidate_id} is not APPROVED")
@@ -91,8 +88,10 @@ def render(evidence: EvidenceStore, candidate_id: str, *, secret: bytes, git: Ma
         "provenance.json": canonical(provenance),
     }
     if harness_id:
-        harness = evidence.get("policy_candidates", harness_id)
-        for name, document in harness.get("bundle_files", {}).items():
+        harness = HarnessCandidate.from_record(evidence.get("policy_candidates", harness_id))
+        if evidence.state("policy_candidate", harness_id) != "VERIFIED":
+            raise IntegrityError(f"harness candidate {harness_id} is not VERIFIED")
+        for name, document in sorted(harness_bundle_files(harness, PromptRegistry(evidence)).items()):
             files[f"harness/{name}"] = canonical(document)
     public = signer.key_id(ed25519.public_key(secret))
     manifest = {

@@ -54,6 +54,20 @@ class HarnessCandidate:
             for component, prompt_id in sorted(self.components.items())
         }
 
+    @classmethod
+    def from_record(cls, record: Mapping[str, Any]) -> HarnessCandidate:
+        """Rebuild from a ``policy_candidates`` record of kind ``harness``; its ID must match its content."""
+        if record.get("kind") != "harness":
+            raise ValidationError(f"{record.get('candidate_id')} is not a harness candidate")
+        harness = record["harness"]
+        candidate = cls(candidate_id=record["candidate_id"], parent_candidate_id=record.get("parent_id"),
+                        components=dict(harness["components"]), recovery_policy=dict(harness["recovery_policy"]),
+                        generation_method=harness["generation_method"], training_case_ids=tuple(harness["training_case_ids"]),
+                        created_at=str(record.get("created_at", "")))
+        if candidate.candidate_id != record["candidate_id"]:
+            raise IntegrityError(f"harness candidate {record['candidate_id']} does not match its content address")
+        return candidate
+
     def to_dict(self) -> dict[str, Any]:
         return {
             "candidate_id": self.candidate_id,

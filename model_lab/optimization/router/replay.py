@@ -73,8 +73,8 @@ def frontier_migration(
     non_inferior_cheaper_count = 0
     
     for d, group_ex in by_domain.items():
-        cand_rep = evaluate(candidate, group_ex, min_ess=0.0)  # only the value and action distribution are used
-        base_rep = evaluate(baseline, group_ex, min_ess=0.0)
+        cand_rep = evaluate(candidate, group_ex, min_ess=0.0, bootstrap=0, direct_method=False)  # value + action distribution only
+        base_rep = evaluate(baseline, group_ex, min_ess=0.0, bootstrap=0, direct_method=False)
         
         cand_val = cand_rep["snips"]
         base_val = base_rep["snips"]

@@ -101,6 +101,11 @@ def static_policy(context: Mapping[str, Any], eligible: Sequence[str]) -> str:
     return "sim/balanced" if "sim/balanced" in eligible else eligible[0]
 
 
+def balanced_only_policy(context: Mapping[str, Any], eligible: Sequence[str]) -> str:
+    """A deliberately naive pre-optimization router (balanced for everything) with real, learnable headroom."""
+    return "sim/balanced" if "sim/balanced" in eligible else eligible[0]
+
+
 def epsilon_greedy(base: Callable[[Mapping[str, Any], Sequence[str]], str], epsilon: float) -> Callable[[Mapping[str, Any], Sequence[str], random.Random], tuple[str, float, bool]]:
     """Logging policy with exact propensities: base choice w.p. 1-ε+ε/k, others ε/k."""
     def choose(context: Mapping[str, Any], eligible: Sequence[str], rng: random.Random) -> tuple[str, float, bool]:
@@ -133,10 +138,14 @@ def _context(rng: random.Random) -> dict[str, Any]:
 
 def generate_batch(*, seed: int, batch_index: int = 0, runs: int = 200, epsilon: float = 0.3,
                    logging_policy_version: str = "static-v1", shadow_policy: Callable[[Mapping[str, Any], Sequence[str]], tuple[str, float]] | None = None,
-                   shadow_policy_version: str | None = None, faults: Mapping[str, int] | None = None) -> dict[str, Any]:
-    """One deterministic batch. ``faults`` injects bad records: missing_propensity, secret, duplicate_run, bad_context, ineligible_choice."""
+                   shadow_policy_version: str | None = None, faults: Mapping[str, int] | None = None,
+                   base_policy: Callable[[Mapping[str, Any], Sequence[str]], str] = static_policy) -> dict[str, Any]:
+    """One deterministic batch. ``faults`` injects bad records: missing_propensity, secret, duplicate_run, bad_context, ineligible_choice.
+
+    ``base_policy`` is the logging router's greedy choice; ``epsilon`` exploration on top of it gives exact propensities.
+    """
     rng = random.Random(f"{seed}:{batch_index}")
-    choose = epsilon_greedy(static_policy, epsilon)
+    choose = epsilon_greedy(base_policy, epsilon)
     start = BASE_TIME + timedelta(days=batch_index)
     out_runs: list[dict[str, Any]] = []
     for i in range(runs):

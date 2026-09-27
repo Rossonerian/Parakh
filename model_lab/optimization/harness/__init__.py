@@ -9,6 +9,7 @@ from model_lab.optimization.harness.optimizer import (
     FailureSummary,
     OptimizationResult,
     optimize,
+    persist_candidate,
 )
 from model_lab.optimization.harness.prompt_registry import (
     COMPONENTS,
@@ -34,5 +35,6 @@ __all__ = [
     "export_bundle",
     "optimize",
     "persist",
+    "persist_candidate",
     "simulated_task",
 ]

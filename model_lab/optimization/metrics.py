@@ -13,7 +13,7 @@ from typing import Any
 
 from model_lab.storage.evidence import CANDIDATE_ROLES, EvidenceStore
 
-CRITICAL_GATES = ("oracle_isolation", "core_regression", "critical_failures", "holdout")
+CRITICAL_GATES = ("oracle_isolation", "harness_oracle_isolation", "core_regression", "critical_failures", "holdout")
 
 
 def _ratio(numerator: float, denominator: float) -> float | None:

@@ -149,7 +149,7 @@ class OptimizationResult:
     holdout_evaluated: bool = False
 
 
-def _persist_candidate(evidence: EvidenceStore, candidate: HarnessCandidate) -> None:
+def persist_candidate(evidence: EvidenceStore, candidate: HarnessCandidate) -> None:
     """Persist candidate as a policy candidate and transition DRAFT -> TRAINED."""
     record = {
         "candidate_id": candidate.candidate_id,
@@ -217,7 +217,7 @@ def optimize(
         created_at=utc_now(),
     )
 
-    _persist_candidate(evidence, baseline_candidate)
+    persist_candidate(evidence, baseline_candidate)
 
     provider = provider_factory() if callable(provider_factory) else provider_factory
     base_train_eval = evaluate(baseline_candidate, registry, train_cases, provider, split_label="train")
@@ -294,7 +294,7 @@ def optimize(
 
             if child.candidate_id not in candidates:
                 candidates[child.candidate_id] = child
-                _persist_candidate(evidence, child)
+                persist_candidate(evidence, child)
                 child_train_eval = evaluate(child, registry, train_cases, provider, split_label="train")
                 persist(evidence, child_train_eval)
                 train_evals[child.candidate_id] = child_train_eval

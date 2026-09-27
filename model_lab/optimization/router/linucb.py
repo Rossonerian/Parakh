@@ -32,7 +32,10 @@ class LinUCBModel:
                 
                 # dot(theta, x)
                 mean = sum(th * xi for th, xi in zip(theta, x, strict=False))
-                
+                if not self.alpha:  # the bonus term is multiplied by alpha: skip the O(d^2) variance
+                    res[a] = mean
+                    continue
+
                 # x^T A^{-1} x
                 variance = 0.0
                 for i in range(self.dimension):
@@ -40,7 +43,7 @@ class LinUCBModel:
                     for j in range(self.dimension):
                         row_i += a_inv[i][j] * x[j]
                     variance += x[i] * row_i
-                
+
                 res[a] = mean + self.alpha * math.sqrt(max(0.0, variance))
         return res
 
