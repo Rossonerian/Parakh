@@ -457,17 +457,23 @@ class ParakhApp(App[None]):
     @on(DataTable.RowHighlighted, "#cand-table")
     def _show_candidate(self, event: DataTable.RowHighlighted) -> None:
         if self.state is not None and event.row_key.value:
-            self.query_one(CandidateReviewView).show_item(self.state, str(event.row_key.value))
+            views = self.query(CandidateReviewView).nodes
+            if views:  # A queued highlight can outlive its tab during shutdown.
+                views[0].show_item(self.state, str(event.row_key.value))
 
     @on(DataTable.RowHighlighted, "#pref-table")
     def _show_pair(self, event: DataTable.RowHighlighted) -> None:
         if self.state is not None and event.row_key.value:
-            self.query_one(PreferenceReviewView).show_item(self.state, str(event.row_key.value))
+            views = self.query(PreferenceReviewView).nodes
+            if views:
+                views[0].show_item(self.state, str(event.row_key.value))
 
     @on(DataTable.RowHighlighted, "#policy-table")
     def _show_policy(self, event: DataTable.RowHighlighted) -> None:
         if self.state is not None and event.row_key.value:
-            self.query_one(PolicyView).show_item(self.state, str(event.row_key.value))
+            views = self.query(PolicyView).nodes
+            if views:
+                views[0].show_item(self.state, str(event.row_key.value))
 
     def _operator_fields(self, prefix: str) -> tuple[str, str]:
         return self.query_one(f"#{prefix}-actor", Input).value, self.query_one(f"#{prefix}-reason", Input).value
