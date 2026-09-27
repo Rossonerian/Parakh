@@ -149,12 +149,13 @@ def reward_for_run(
         confidence *= 0.8
     confidence = max(0.0, min(1.0, confidence))
 
-    if Q is None:
-        scalar = None
-        excluded_reason = "no_quality_signal"
-    elif safety_violation:
+    if safety_violation:
+        # A critical failure is never excluded for lack of other signals: it must stay visible to optimizers.
         scalar = config.critical_failure_reward
         excluded_reason = None
+    elif Q is None:
+        scalar = None
+        excluded_reason = "no_quality_signal"
     else:
         wq = config.weights.get("quality", 1.0)
         wc = config.weights.get("cost", 0.2)
@@ -276,12 +277,13 @@ def reward_for_attempt(
         confidence *= 0.8
     confidence = max(0.0, min(1.0, confidence))
 
-    if Q is None:
-        scalar = None
-        excluded_reason = "no_quality_signal"
-    elif safety_violation:
+    if safety_violation:
+        # A critical failure is never excluded for lack of other signals: it must stay visible to optimizers.
         scalar = config.critical_failure_reward
         excluded_reason = None
+    elif Q is None:
+        scalar = None
+        excluded_reason = "no_quality_signal"
     else:
         wq = config.weights.get("quality", 1.0)
         wc = config.weights.get("cost", 0.2)
