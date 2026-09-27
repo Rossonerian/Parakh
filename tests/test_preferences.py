@@ -108,24 +108,24 @@ def test_extract_pairs_lifecycle_and_privacy(base_run, tmp_path: Path):
                 "feedback_id": "fb_prop",
                 "feedback_type": "edit",
                 "correction_kind_hint": "factual",
-                "corrected_value": "Paris is the capital",
-                "original_value": "Lyon is the capital",
+                "sanitized_corrected_value": "Paris is the capital",
+                "sanitized_original_value": "Lyon is the capital",
                 "created_at": "2026-09-27T00:00:00Z",
             },
             # Intent change -> EXCLUDED
             {
                 "feedback_id": "fb_intent",
                 "feedback_type": "intent_change",
-                "corrected_value": "Write a poem instead",
-                "original_value": "Here is an essay",
+                "sanitized_corrected_value": "Write a poem instead",
+                "sanitized_original_value": "Here is an essay",
                 "created_at": "2026-09-27T00:00:00Z",
             },
             # Ambiguous -> NEEDS_REVIEW
             {
                 "feedback_id": "fb_ambig",
                 "feedback_type": "edit",
-                "corrected_value": "Some adjustment",
-                "original_value": "Previous response",
+                "sanitized_corrected_value": "Some adjustment",
+                "sanitized_original_value": "Previous response",
                 "created_at": "2026-09-27T00:00:00Z",
             },
             # Privacy leak (Bearer token) -> EXCLUDED with reason privacy
@@ -133,8 +133,8 @@ def test_extract_pairs_lifecycle_and_privacy(base_run, tmp_path: Path):
                 "feedback_id": "fb_priv_bearer",
                 "feedback_type": "edit",
                 "correction_kind_hint": "factual",
-                "corrected_value": "Bearer abcdef1234567890",
-                "original_value": "old text",
+                "sanitized_corrected_value": "Bearer abcdef1234567890",
+                "sanitized_original_value": "old text",
                 "created_at": "2026-09-27T00:00:00Z",
             },
             # Privacy leak (sk- token) -> EXCLUDED
@@ -142,8 +142,8 @@ def test_extract_pairs_lifecycle_and_privacy(base_run, tmp_path: Path):
                 "feedback_id": "fb_priv_sk",
                 "feedback_type": "edit",
                 "correction_kind_hint": "factual",
-                "corrected_value": "sk-proj12345678abcdef",
-                "original_value": "old text",
+                "sanitized_corrected_value": "sk-proj12345678abcdef",
+                "sanitized_original_value": "old text",
                 "created_at": "2026-09-27T00:00:00Z",
             },
             # Privacy leak (email) -> EXCLUDED
@@ -151,8 +151,8 @@ def test_extract_pairs_lifecycle_and_privacy(base_run, tmp_path: Path):
                 "feedback_id": "fb_priv_email",
                 "feedback_type": "edit",
                 "correction_kind_hint": "factual",
-                "corrected_value": "Contact alice@example.com for details",
-                "original_value": "old text",
+                "sanitized_corrected_value": "Contact alice@example.com for details",
+                "sanitized_original_value": "old text",
                 "created_at": "2026-09-27T00:00:00Z",
             },
             # Missing chosen text -> EXCLUDED
@@ -160,8 +160,8 @@ def test_extract_pairs_lifecycle_and_privacy(base_run, tmp_path: Path):
                 "feedback_id": "fb_missing_chosen",
                 "feedback_type": "edit",
                 "correction_kind_hint": "factual",
-                "corrected_value": "",
-                "original_value": "valid old text",
+                "sanitized_corrected_value": "",
+                "sanitized_original_value": "valid old text",
                 "created_at": "2026-09-27T00:00:00Z",
             },
         ),
@@ -200,8 +200,8 @@ def test_review_flow_and_transitions(base_run, tmp_path: Path):
             {
                 "feedback_id": "fb_rev",
                 "feedback_type": "edit",
-                "corrected_value": "Better value",
-                "original_value": "Old value",
+                "sanitized_corrected_value": "Better value",
+                "sanitized_original_value": "Old value",
                 "created_at": "2026-09-27T00:00:00Z",
             },
         ),
@@ -240,15 +240,15 @@ def test_export_and_readiness_gate(base_run, tmp_path: Path):
                 "feedback_id": "fb_1",
                 "feedback_type": "edit",
                 "correction_kind_hint": "factual",
-                "corrected_value": "Paris",
-                "original_value": "Berlin",
+                "sanitized_corrected_value": "Paris",
+                "sanitized_original_value": "Berlin",
                 "created_at": "2026-09-27T00:00:00Z",
             },
             {
                 "feedback_id": "fb_2",
                 "feedback_type": "intent_change",
-                "corrected_value": "Poem",
-                "original_value": "Essay",
+                "sanitized_corrected_value": "Poem",
+                "sanitized_original_value": "Essay",
                 "created_at": "2026-09-27T00:00:00Z",
             },
         ),
@@ -295,3 +295,20 @@ def test_export_and_readiness_gate(base_run, tmp_path: Path):
     assert gate_ok["has_trainable_target"] is True
     assert gate_ok["reasons"] == []
     store.close()
+
+
+def test_reextraction_after_approval_is_idempotent(tmp_path):
+    from model_lab.preferences.extractor import extract_pairs, review
+    from model_lab.storage import SQLiteStore
+    from model_lab.storage.evidence import EvidenceStore
+    from model_lab.telemetry.schema import parse_batch
+    from model_lab.telemetry.synthetic import generate_batch
+
+    runs = [r for r in parse_batch(generate_batch(seed=21, runs=300)).valid if r.feedback]
+    evidence = EvidenceStore(SQLiteStore(tmp_path / "db.sqlite3"))
+    first = extract_pairs(evidence, runs, min_confidence=0.7)
+    proposed = [p for p in first if p["approval_state"] == "PROPOSED"]
+    assert proposed and all(p["chosen"].startswith("[synthetic corrected") for p in proposed)
+    review(evidence, proposed[0]["pair_id"], "approve", actor="operator", reason="checked")
+    again = extract_pairs(evidence, runs, min_confidence=0.7)
+    assert {p["pair_id"]: p["approval_state"] for p in again}[proposed[0]["pair_id"]] == "APPROVED"

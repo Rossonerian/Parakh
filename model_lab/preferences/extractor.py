@@ -52,10 +52,9 @@ def extract_pairs(
             pair_id = "pair-" + stable_hash({"feedback_id": feedback_id, "run_id": run.run_id})[:20]
             prompt_or_context_ref = f"traj-{run.run_id}"
 
-            chosen = feedback.get("corrected_value") or feedback.get("chosen") or feedback.get("text")
-            rejected = feedback.get("original_value") or feedback.get("rejected")
-            if rejected is None and run.attempts:
-                rejected = run.attempts[-1].get("response_text")
+            # Only the contract's sanitized fields may become training text (TelemetryBatchV1 feedback).
+            chosen = feedback.get("sanitized_corrected_value")
+            rejected = feedback.get("sanitized_original_value")
 
             chosen_str = str(chosen) if chosen is not None else ""
             rejected_str = str(rejected) if rejected is not None else ""
@@ -116,11 +115,11 @@ def extract_pairs(
                 "source_run_id": run.run_id,
                 "feedback_id": feedback_id,
                 "schema_version": PREFERENCE_SCHEMA_VERSION,
-                "approval_state": final_state,
+                "initial_state": target_state,
             }
 
             evidence.append("preference_pairs", pair_id, record)
-            extracted.append(record)
+            extracted.append({**record, "approval_state": final_state})
 
     return extracted
 
