@@ -12,6 +12,15 @@ from model_lab.errors import ValidationError
 from model_lab.schema_registry import ROUTER_MODEL_SCHEMA_VERSION
 from model_lab.optimization.router.features import feature_schema
 
+def _validate_exploration(exploration: Mapping[str, Any]) -> None:
+    if not isinstance(exploration, Mapping):
+        raise ValidationError("exploration settings must be an object")
+    mode, epsilon = exploration.get("mode"), exploration.get("epsilon")
+    if (mode not in ("none", "epsilon_greedy") or isinstance(epsilon, bool)
+            or not isinstance(epsilon, (int, float)) or not math.isfinite(epsilon) or not 0.0 <= epsilon <= 1.0):
+        raise ValidationError("exploration epsilon must be finite and between 0 and 1")
+
+
 @dataclass(frozen=True)
 class LinUCBModel:
     actions: tuple[str, ...]
@@ -96,6 +105,7 @@ def fit(
     weight_clip: float = 10.0,
     epsilon: float = 0.05,
 ) -> LinUCBModel:
+    _validate_exploration({"mode": "epsilon_greedy", "epsilon": epsilon})
     
     sorted_actions = tuple(sorted(actions))
     
@@ -183,6 +193,7 @@ def from_policy_document(doc: dict) -> LinUCBModel:
         raise ValidationError("Not a linucb policy document")
     if doc.get("policy_schema_version") != ROUTER_MODEL_SCHEMA_VERSION:
         raise ValidationError("Schema version mismatch")
+    _validate_exploration(doc.get("exploration") or {})
         
     dim = doc["feature_dimension"]
     params = doc["parameters"]

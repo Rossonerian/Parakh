@@ -11,6 +11,7 @@ from model_lab.optimization.router.linucb import fit, to_policy_document, from_p
 from model_lab.optimization.router.trainer import train_candidate, reproduce
 from model_lab.storage.evidence import EvidenceStore
 from model_lab.storage.sqlite import SQLiteStore
+from model_lab.errors import ValidationError
 
 def _compute_reward(outcome: dict[str, Any]) -> float:
     completed = 1.0 if outcome.get("completed") else 0.0
@@ -276,3 +277,14 @@ def test_dataset_exclusions_and_splits():
             group_splits[g] = ex["split"]
         else:
             assert group_splits[g] == ex["split"]
+
+
+@pytest.mark.parametrize("epsilon", [-0.1, 1.1, float("nan")])
+def test_invalid_exploration_probability_is_rejected(epsilon):
+    with pytest.raises(ValidationError, match="exploration"):
+        fit([], actions=["sim/cheap"], dimension=1, epsilon=epsilon)
+    model = fit([], actions=["sim/cheap"], dimension=1, epsilon=0.05)
+    document = to_policy_document(model)
+    document["exploration"]["epsilon"] = epsilon
+    with pytest.raises(ValidationError, match="exploration"):
+        from_policy_document(document)

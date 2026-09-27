@@ -45,18 +45,22 @@ def compounding_metrics(evidence: EvidenceStore, *, propensity_floor: float = 0.
         if o["run_id"] in live_by_run:
             disagreements.setdefault(o["policy_version"], []).append(o["chosen_action"] != live_by_run[o["run_id"]])
 
-    successes, cost_total, reward_values, reward_cost, reward_seconds = 0, 0.0, [], 0.0, 0.0
+    successes = 0
+    reward_rows: list[tuple[float, dict[str, Any]]] = []
     for t in trajectories:
         outcome = t.get("final_outcome") or {}
         if outcome.get("completed") is True:
             successes += 1
-        if outcome.get("final_cost") is not None and outcome.get("currency") == "USD":
-            cost_total += float(outcome["final_cost"])
         reward = rewards.get(t["run_id"])
         if reward and reward.get("scalar") is not None:
-            reward_values.append(reward["scalar"])
-            reward_cost += float(outcome.get("final_cost") or 0.0) if outcome.get("currency") == "USD" else 0.0
-            reward_seconds += float(outcome.get("final_latency_ms") or 0.0) / 1000.0
+            reward_rows.append((float(reward["scalar"]), outcome))
+    cost_known = bool(outcomes) and all(o.get("completed") is not None and o.get("final_cost") is not None
+                                            and o.get("currency") == "USD" for o in outcomes)
+    reward_cost_known = bool(reward_rows) and all(o.get("final_cost") is not None and o.get("currency") == "USD"
+                                                  for _, o in reward_rows)
+    reward_latency_known = bool(reward_rows) and all(o.get("final_latency_ms") is not None for _, o in reward_rows)
+    reward_values = [value for value, _ in reward_rows]
+    total_reward = sum(reward_values)
 
     coverage: dict[str, dict[str, int]] = {}
     supported_cells, total_cells = 0, 0
@@ -90,9 +94,10 @@ def compounding_metrics(evidence: EvidenceStore, *, propensity_floor: float = 0.
             "runs": len(outcomes),
         },
         "shadow_disagreement": {version: {"rate": _ratio(sum(v), len(v)), "n": len(v)} for version, v in sorted(disagreements.items())},
-        "cost_per_successful_run_usd": _ratio(cost_total, successes),
-        "reward_per_dollar": _ratio(sum(reward_values), reward_cost),
-        "reward_per_second": _ratio(sum(reward_values), reward_seconds),
+        "cost_per_successful_run_usd": _ratio(sum(float(o["final_cost"]) for o in outcomes), successes) if cost_known else None,
+        "reward_per_dollar": _ratio(total_reward, sum(float(o["final_cost"]) for _, o in reward_rows)) if reward_cost_known else None,
+        "reward_per_second": _ratio(total_reward, sum(float(o["final_latency_ms"]) for _, o in reward_rows) / 1000.0)
+                             if reward_latency_known else None,
         "mean_reward": mean(reward_values) if reward_values else None,
         "critical_regression_rate": {"value": _ratio(len(critical_failed), len(reports)), "reports": len(reports)},
         "model_tier_coverage": coverage,

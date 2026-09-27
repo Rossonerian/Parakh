@@ -10,6 +10,7 @@ is SIMULATED evidence.
 from __future__ import annotations
 
 import contextlib
+import hashlib
 import io
 import json
 import shutil
@@ -206,6 +207,33 @@ def test_tampered_bundle_is_rejected_by_parakh_and_karmi(loop, tmp_path):
     assert code == 2 and "checksum mismatch routing_policy.json" in result["errors"]
     code, result = cli("artifact", "karmi-check", copy, "--trusted-public-key", loop["public_key"])
     assert code == 2 and result["accepted"] is False
+
+
+
+@pytest.mark.parametrize("epsilon", [-0.2, 1.2])
+def test_karmi_rejects_signed_bundle_with_invalid_exploration(loop, tmp_path, epsilon):
+    copy = tmp_path / "invalid-exploration"
+    shutil.copytree(loop["bundle"], copy)
+    policy = copy / "routing_policy.json"
+    policy.chmod(0o644)
+    document = json.loads(policy.read_text(encoding="utf-8"))
+    document["exploration"]["epsilon"] = epsilon
+    content = bundle.canonical(document)
+    policy.write_bytes(content)
+    checksums_file = copy / "checksums.json"
+    checksums_file.chmod(0o644)
+    checksums = json.loads(checksums_file.read_text(encoding="utf-8"))
+    checksums["files"]["routing_policy.json"] = hashlib.sha256(content).hexdigest()
+    signed_bytes = bundle.canonical(checksums)
+    checksums_file.write_bytes(signed_bytes)
+    signature = copy / "signature.sig"
+    signature.chmod(0o644)
+    signature.write_bytes(bundle.canonical(signer.sign(signer.load_private(loop["work"] / "key.hex"),
+                                                       signed_bytes, signed_file="checksums.json")))
+    assert bundle.verify(copy, [loop["public_key"]]) == []
+    with pytest.raises(karmi.BundleRejected, match="exploration probability"):
+        karmi.load_bundle(copy, trusted_public_keys=[loop["public_key"]], karmi_version="0.1.0",
+                          known_actions=SIM_ACTIONS, expected_feature_schema_version=FEATURE_SCHEMA_VERSION)
 
 
 def test_next_telemetry_cycle_returns_shadow_evidence(loop):

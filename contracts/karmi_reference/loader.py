@@ -124,11 +124,15 @@ class LoadedPolicy:
 def load_bundle(path: str | Path, *, trusted_public_keys: Iterable[str], karmi_version: str, known_actions: Iterable[str],
                 expected_feature_schema_version: str) -> LoadedPolicy:
     root = Path(path)
+    if (root / "checksums.json").is_symlink() or (root / "signature.sig").is_symlink():
+        raise BundleRejected("symlink in bundle metadata")
     try:
         checksums_bytes = (root / "checksums.json").read_bytes()
         signature = json.loads((root / "signature.sig").read_text(encoding="utf-8"))
     except (OSError, ValueError) as exc:
         raise BundleRejected(f"unreadable bundle: {exc}") from exc
+    if not isinstance(signature, dict):
+        raise BundleRejected("malformed signature file")
     # 1. signature over checksums.json with a trusted key
     try:
         public, sig = bytes.fromhex(signature["public_key"]), bytes.fromhex(signature["signature"])
@@ -140,14 +144,31 @@ def load_bundle(path: str | Path, *, trusted_public_keys: Iterable[str], karmi_v
         raise BundleRejected("signature invalid")
     # 2. checksums of every file, and nothing extra
     checksums = json.loads(checksums_bytes)
-    listed = checksums.get("files", {})
-    present = {str(p.relative_to(root)) for p in root.rglob("*") if p.is_file()} - {"checksums.json", "signature.sig"}
+    if not isinstance(checksums, dict) or not isinstance(checksums.get("files"), dict):
+        raise BundleRejected("invalid checksums file")
+    if any(not isinstance(name, str) or not isinstance(digest, str) for name, digest in checksums["files"].items()):
+        raise BundleRejected("invalid checksums file")
+    listed = checksums["files"]
+    entries = list(root.rglob("*"))
+    if any(p.is_symlink() for p in entries):
+        raise BundleRejected("symlink in bundle")
+    present = {str(p.relative_to(root)) for p in entries if p.is_file()} - {"checksums.json", "signature.sig"}
     if present != set(listed):
         raise BundleRejected(f"file set mismatch: {sorted(present ^ set(listed))}")
+    resolved_root = root.resolve()
     for name, digest in listed.items():
-        if hashlib.sha256((root / name).read_bytes()).hexdigest() != digest:
-            raise BundleRejected(f"checksum mismatch: {name}")
-    documents = {name: json.loads((root / name).read_text(encoding="utf-8")) for name in REQUIRED_FILES if name in listed}
+        if (not isinstance(name, str) or not isinstance(digest, str) or not name or "\\" in name
+                or Path(name).is_absolute() or ".." in Path(name).parts or not (root / name).resolve().is_relative_to(resolved_root)):
+            raise BundleRejected(f"unsafe bundle path: {name}")
+        try:
+            if hashlib.sha256((root / name).read_bytes()).hexdigest() != digest:
+                raise BundleRejected(f"checksum mismatch: {name}")
+        except OSError as exc:
+            raise BundleRejected(f"unreadable bundle file: {name}") from exc
+    try:
+        documents = {name: json.loads((root / name).read_text(encoding="utf-8")) for name in REQUIRED_FILES if name in listed}
+    except (OSError, ValueError) as exc:
+        raise BundleRejected("unreadable bundle document") from exc
     missing = [name for name in REQUIRED_FILES if name not in documents]
     if missing:
         raise BundleRejected(f"missing files: {missing}")
@@ -162,6 +183,12 @@ def load_bundle(path: str | Path, *, trusted_public_keys: Iterable[str], karmi_v
         raise BundleRejected("feature schema incompatible")
     if policy.get("feature_dimension") != len(features.get("features", [])):
         raise BundleRejected("policy dimension does not match feature schema")
+    exploration = policy.get("exploration")
+    epsilon = exploration.get("epsilon") if isinstance(exploration, dict) else None
+    if (not isinstance(exploration, dict) or exploration.get("mode") not in ("none", "epsilon_greedy")
+            or isinstance(epsilon, bool) or not isinstance(epsilon, (int, float))
+            or not math.isfinite(epsilon) or not 0.0 <= epsilon <= 1.0):
+        raise BundleRejected("invalid exploration probability")
     # 5. model ids exist in Karmi's registry
     unknown = set(policy.get("actions", [])) - set(known_actions)
     if unknown:

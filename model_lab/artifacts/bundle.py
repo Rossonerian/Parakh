@@ -147,8 +147,10 @@ def export(evidence: EvidenceStore, candidate_id: str, *, out_root: str | Path, 
 
 
 def verify(path: str | Path, trusted_public_keys: Iterable[str]) -> list[str]:
-    """Parakh-side bundle check: signature, checksums, and that no unlisted files exist."""
+    """Parakh-side bundle check: trusted signature, exact file set and contained checksums."""
     root = Path(path)
+    if (root / CHECKSUMS).is_symlink() or (root / SIGNATURE).is_symlink():
+        return ["symlink in bundle metadata"]
     errors: list[str] = []
     try:
         checksums_bytes = (root / CHECKSUMS).read_bytes()
@@ -156,12 +158,27 @@ def verify(path: str | Path, trusted_public_keys: Iterable[str]) -> list[str]:
         checksums = json.loads(checksums_bytes)
     except (OSError, ValueError) as exc:
         return [f"unreadable bundle: {exc}"]
+    if not isinstance(signature, dict) or not isinstance(checksums, dict):
+        return ["invalid bundle metadata"]
     errors.extend(signer.verify(signature, checksums_bytes, trusted_public_keys))
-    listed = set(checksums.get("files", {}))
-    present = {str(p.relative_to(root)) for p in root.rglob("*") if p.is_file()} - {CHECKSUMS, SIGNATURE}
-    errors.extend(f"unlisted file {name}" for name in sorted(present - listed))
-    for name, digest in sorted(checksums.get("files", {}).items()):
-        file = root / name
+    files = checksums.get("files")
+    if not isinstance(files, dict) or any(not isinstance(name, str) or not isinstance(digest, str)
+                                           for name, digest in files.items()):
+        return errors + ["invalid checksum file list"]
+    entries = list(root.rglob("*"))
+    errors.extend(f"symlink in bundle: {p.relative_to(root)}" for p in entries if p.is_symlink())
+    present = {str(p.relative_to(root)) for p in entries if p.is_file()} - {CHECKSUMS, SIGNATURE}
+    errors.extend(f"unlisted file {name}" for name in sorted(present - files.keys()))
+    errors.extend(f"missing listed file {name}" for name in sorted(files.keys() - present))
+    resolved_root = root.resolve()
+    for name, digest in sorted(files.items()):
+        part = Path(name)
+        if not name or "\\" in name or part.is_absolute() or ".." in part.parts or not (root / part).resolve().is_relative_to(resolved_root):
+            errors.append(f"unsafe bundle path {name}")
+            continue
+        file = root / part
+        if file.is_symlink():
+            continue
         if not file.is_file():
             errors.append(f"missing file {name}")
         elif _sha256(file.read_bytes()) != digest:
