@@ -27,6 +27,9 @@ include = ["model_lab*", "contracts*"]
 "model_lab.optimization.harness" = ["*.json"]
 contracts = ["*.json", "fixtures/*.json"]
 
+[tool.setuptools.data-files]
+"share/parakh/benchmarks" = ["benchmarks/seed_cases.jsonl"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"

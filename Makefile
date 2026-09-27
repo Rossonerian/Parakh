@@ -22,7 +22,7 @@ test-integration:
 	$(PYTHON) -m pytest -q tests/test_storage_execution.py tests/test_ingestion_budget.py tests/test_offline_e2e.py
 
 test-e2e:
-	$(PYTHON) -m pytest -q tests/test_offline_e2e.py
+	$(PYTHON) -m pytest -q tests/test_offline_e2e.py tests/test_flywheel.py
 
 test-smoke:
 	$(PYTHON) -m model_lab suite validate benchmarks/seed_cases.jsonl

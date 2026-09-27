@@ -29,7 +29,9 @@ from model_lab.schema_registry import CASE_SCHEMA_VERSION
 from model_lab.schemas import Case, Suite
 
 ROOT = Path(__file__).resolve().parents[1]
-CORE_SUITE_PATH = ROOT / "benchmarks" / "seed_cases.jsonl"
+_SOURCE_CORE = ROOT / "benchmarks" / "seed_cases.jsonl"
+_INSTALLED_CORE = ROOT.parents[2] / "share" / "parakh" / "benchmarks" / "seed_cases.jsonl"
+CORE_SUITE_PATH = _SOURCE_CORE if _SOURCE_CORE.is_file() else _INSTALLED_CORE
 CORE_SUITE_VERSION = "0.1.0"
 CORE_SUITE_SHA256 = "9f82842371ab949a1018c5625875b1830d625d95c7b7380d5e35a172f8df230e"
 CORE_CREATED_AT = "2026-09-09T00:00:00+00:00"  # seed bank preparation date (README)
