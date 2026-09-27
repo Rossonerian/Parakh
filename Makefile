@@ -1,4 +1,5 @@
 PYTHON ?= python3
+DEMO_OUT ?= lab-data/demo
 
 .PHONY: lint doctor dev tui test-unit test-integration test-e2e test-smoke test-release demo
 
@@ -30,4 +31,4 @@ test-smoke:
 test-release: lint doctor test-unit test-integration test-e2e test-smoke
 
 demo:
-	$(PYTHON) -m model_lab demo --suite benchmarks/seed_cases.jsonl --out lab-data/demo
+	$(PYTHON) -m model_lab demo --suite benchmarks/seed_cases.jsonl --out $(DEMO_OUT)
