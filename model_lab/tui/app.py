@@ -113,6 +113,7 @@ class ParakhApp(App[None]):
     .buttons Button { margin-right: 1; }
     DataTable { height: auto; max-height: 24; }
     #cases-table, #runs-table, #review-table { height: 1fr; max-height: 100%; }
+    #cand-table, #pref-table { height: 1fr; min-height: 4; max-height: 12; }
     #event-log { height: 1fr; }
     """
     BINDINGS = [

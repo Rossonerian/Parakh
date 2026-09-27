@@ -94,6 +94,20 @@ def test_candidate_review_needs_a_named_operator_and_records_the_role(workspace:
     assert [h["to_state"] for h in history][-2:] == ["APPROVED", "REGRESSION"] and history[-1]["actor"] == "ops-lead"
 
 
+def test_candidate_review_controls_fit_a_standard_terminal(workspace: Path):
+    async def scenario():
+        app = ParakhApp(data_dir=workspace, suite_path=SUITE, poll_seconds=0.1)
+        async with app.run_test(size=(160, 44)) as pilot:
+            await pilot.press("t")
+            table = app.query_one("#cand-table", DataTable)
+            await _until(pilot, lambda: table.row_count > 24)
+            await pilot.pause(0.2)
+            controls = ("#cand-actor", "#cand-reason", "#cand-role", "#btn-cand-approve", "#btn-cand-reject")
+            assert all(app.query_one(selector).region.bottom < app.size.height - 1 for selector in controls)
+
+    asyncio.run(scenario())
+
+
 def test_ambiguous_preference_pair_is_classified_then_approved_by_an_operator(workspace: Path):
     db = workspace / DB_NAME
     waiting = [pid for pid, state in _states(db, "preference_pair").items() if state == "NEEDS_REVIEW"]

@@ -451,7 +451,7 @@ def _review_controls(prefix: str, buttons: Sequence[tuple[str, str, str]], *, ro
             yield Button(label, id=button_id, variant=variant)  # type: ignore[arg-type]
 
 
-class CandidateReviewView(Vertical):
+class CandidateReviewView(VerticalScroll):
     """Quarantined telemetry-derived cases. Operator view: routing metadata, never free text or references."""
 
     selected: str | None = None
@@ -498,7 +498,7 @@ class CandidateReviewView(Vertical):
             f"{fmt.text(row.lineage.get('producer_repo'))} {fmt.text(row.lineage.get('producer_version'))}")
 
 
-class PreferenceReviewView(Vertical):
+class PreferenceReviewView(VerticalScroll):
     """Correction-derived preference pairs; ambiguous or low-confidence ones wait here for a human decision."""
 
     selected: str | None = None
