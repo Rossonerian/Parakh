@@ -2,9 +2,37 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
-from scripts import readiness
+from scripts import readiness, security_probe
+
+
+def _tracked_repo(root: Path, files: dict[str, bytes]) -> Path:
+    for relative, content in files.items():
+        (root / relative).parent.mkdir(parents=True, exist_ok=True)
+        (root / relative).write_bytes(content)
+    subprocess.run(["git", "init", "-q", str(root)], check=True)
+    subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+    return root
+
+
+def test_secret_scan_allows_only_the_exact_reviewed_fixture(tmp_path: Path) -> None:
+    source = Path(__file__).resolve().parents[1]
+    fixture = (source / "tests/test_tui_console.py").read_bytes()
+    # Assembled at runtime so this test file itself never contains a matching literal.
+    prefix = b"sk-" + b"or-v1-"
+    fake = prefix + b"thisisnotarealkey0987654321"
+    unterminated = b"-----BEGIN " + b"PRIVATE KEY-----\nMIIE"
+    repo = _tracked_repo(tmp_path / "Parakh", {
+        "tests/test_tui_console.py": fixture,                           # reviewed: allowed
+        "tests/test_other.py": b"KEY = '" + fake + b"'\n",                # same value elsewhere
+        "src/app.py": b"KEY = '" + fake[:-1] + b"2'\n",                   # edited value
+        "keys/raw.pem": unterminated,                                     # no END line
+    })
+    findings = {(item["file"], item["reason"]) for item in security_probe.scan(repo)}
+    assert findings == {("tests/test_other.py", "openai-token"), ("src/app.py", "openai-token"),
+                        ("keys/raw.pem", "private-key-header")}
 
 
 def test_missing_checkout_is_blocked_and_report_is_not_ready(tmp_path: Path) -> None:
