@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "rules": [
+    "The testing manager is the OMP project supervisor; it alone integrates, commits and reports the release state.",
+    "Managed workers start only through agent-team-orca-start with a stable assignment ID; at most two attempts per ID.",
+    "No role declares production readiness. The only decision source is production-readiness.json from ./test production-check|release-check on clean, recorded commits.",
+    "Worker claims are unverified until the manager re-runs the named ./test stage and inspects the evidence directory.",
+    "Live providers, payments, WhatsApp, production data and policy promotion stay out of every assignment."
+  ],
+  "roles": {
+    "testing-manager": {
+      "runs_as": "OMP project supervisor (Claude Opus 5.5 for this project); not a managed worker",
+      "owns": ["TESTING_SYSTEM_AUDIT.md", "TESTING_ARCHITECTURE.md", "scripts/readiness.py", "gate definitions", "integration of worker commits"],
+      "commands": ["./test doctor", "./test full", "./test production-check"],
+      "acceptance": "Every gate row traceable to a command, log and commit; checkpoint written at each hard gate."
+    },
+    "backend-test": {
+      "worker_role": "worker_standard",
+      "repo": "Karmi",
+      "owns": ["Karmi tests/unit", "tests/e2e", "tests/integration", "scripts/readiness_config.py"],
+      "gates": ["UNIT", "COMPONENT", "INTEGRATION", "E2E", "KARMI", "PRODUCTION_CONFIG"],
+      "commands": ["./test unit", "./test component", "./test integration", "./test e2e"],
+      "acceptance": "Named stages PASS on a clean Karmi commit; failures diagnosed to root cause, never skipped or weakened."
+    },
+    "parakh-evaluation": {
+      "worker_role": "worker_standard",
+      "repo": "Parakh",
+      "owns": ["model_lab", "Parakh tests", "benchmarks/readiness-baseline.json (proposal only)"],
+      "gates": ["PARAKH", "UNIT"],
+      "commands": ["./test benchmark", "./test unit"],
+      "acceptance": "60-case demo matches the reviewed baseline; any baseline change comes with a reviewed diff (--accept-baseline) and a reason."
+    },
+    "integration": {
+      "worker_role": "worker_primary",
+      "repo": "Parakh",
+      "owns": ["tests/test_cross_repo_readiness.py", "docs/testing/cross-repo.md"],
+      "gates": ["CROSS_SYSTEM"],
+      "commands": ["./test integration"],
+      "acceptance": "Karmi telemetry -> Parakh import -> signed candidate -> Karmi SHADOW with unchanged live route; negative cases (signature, version, duplicate) rejected; PARAKH_REQUIRE_KARMI=1."
+    },
+    "mobile-test": {
+      "worker_role": "worker_primary",
+      "repo": "Karmi",
+      "owns": ["mobile/tool/device_driver.py", "mobile/tool/readiness_device.py"],
+      "gates": ["MOBILE"],
+      "commands": ["./test mobile-smoke", "./test mobile-e2e"],
+      "acceptance": "13 steps PASS with candidate_build_install, source_provenance and installed_candidate PASS on the attached phone. Uninstalling apps or changing device settings requires the phone owner's approval."
+    },
+    "security": {
+      "worker_role": "worker_specialist",
+      "repo": "Parakh",
+      "owns": ["scripts/security_probe.py", "scripts/dependency_audit.py"],
+      "gates": ["SECURITY"],
+      "commands": ["./test security"],
+      "acceptance": "Secret, config, negative auth and OSV checks PASS; new fake fixtures pinned by exact fingerprint only after review; no secret values in evidence."
+    },
+    "performance": {
+      "worker_role": "worker_standard",
+      "repo": "Parakh",
+      "owns": ["scripts/performance_probe.py", "benchmarks/performance-baseline.json (proposal only)"],
+      "gates": ["PERFORMANCE"],
+      "commands": ["./test performance"],
+      "acceptance": "Regression rule holds against the measured baseline on the same host class; thresholds cite their measurement source; production SLOs remain the owner gate SLO_APPROVAL."
+    },
+    "release-gate": {
+      "worker_role": "verifier",
+      "repo": "Parakh",
+      "owns": [],
+      "gates": ["all"],
+      "commands": ["./test release-check"],
+      "acceptance": "Read-only: reports state and not_passing rows from production-readiness.json for the recorded SHAs; confirms both trees were clean; never edits evidence, code or gates."
+    }
+  }
+}

@@ -32,6 +32,28 @@ CI pull requests run available non-live static/unit/component/contract/security 
 
 ## Trust boundaries and agents
 
-Testing manager (OMP project supervisor) owns scope, audit, integration and release decision. Bounded Karmi backend, Parakh evaluation, integration, mobile, security, performance and read-only release verifier assignments may be created when independent slices justify them. OMP planner advises; managed Gemini High workers/verifier start only via `agent-team-orca-start` with stable IDs, disjoint worktrees and recoverable commits. Prefer three concurrent workers, four only with documented need; independent verifier checks exact integrated tree. Workers cannot declare production readiness. No normal OpenAI worker route is configured; quota exhaustion means checkpoint/pause.
+The roles use the existing Orca + OMP hierarchy; nothing is flattened. `docs/testing/agent-roles.json` is the machine-readable definition. `scripts/agent_role_spec.py <role> --assignment-id <ID> --run <run> --task "<bounded change>"` prints the gated launch command with the role's owned paths, gates, verification commands and acceptance; it never launches anything itself.
+
+| Role | Runs as | Owns | Gates |
+|------|---------|------|-------|
+| Testing manager | OMP project supervisor (Opus 5.5 here) | audit, architecture, `scripts/readiness.py`, integration, checkpoints, the reported state | all (coordination) |
+| Backend test | `worker_standard`, Karmi | Karmi unit/E2E/integration tests, `readiness_config.py` | UNIT, COMPONENT, INTEGRATION, E2E, KARMI, PRODUCTION_CONFIG |
+| Parakh evaluation | `worker_standard`, Parakh | `model_lab`, Parakh tests, baseline proposals | PARAKH, UNIT |
+| Integration | `worker_primary`, Parakh | cross-repo contract test | CROSS_SYSTEM |
+| Mobile test | `worker_primary`, Karmi | `mobile/tool/device_driver.py`, `readiness_device.py` | MOBILE |
+| Security | `worker_specialist`, Parakh | `security_probe.py`, `dependency_audit.py` | SECURITY |
+| Performance | `worker_standard`, Parakh | `performance_probe.py`, baseline proposals | PERFORMANCE |
+| Release gate | `verifier`, read-only | nothing | reads `production-readiness.json` only |
+
+Rules for every role:
+
+- The OMP planner advises. Managed Gemini High workers and the verifier start only through `agent-team-orca-start`, each with:
+  - a stable assignment ID, with at most two attempts per ID;
+  - its own worktree;
+  - a recoverable commit.
+- Prefer three concurrent workers. A fourth needs a written reason.
+- Worker claims are unverified until the manager re-runs the named `./test` stage on the integrated tree.
+- No role can declare production readiness. The only decision source is `production-readiness.json`: `release_state()` computes it from recorded evidence on clean commits, and `PRODUCTION` is never set by a command.
+- No normal OpenAI worker route is configured; quota exhaustion means checkpoint and pause.
 
 Cross-repo protocol stays JSON with Karmi `SHADOW` only. Parakh's `sim/*` artifact is *not* accepted by real Karmi's action registry; a test-signed Karmi-action fixture proves compatibility of transport and shadow, not that Parakh has validated that policy for deployment. Parakh's unsupported real-action verification gate remains BLOCKED pending authorized benchmark/provider evidence. The permanent test must assert signature, schema, duplicate handling, unknown version, rollback to unchanged live route and shadow-only output; an incompatible contract fails rather than being silently coerced.
