@@ -1,0 +1,44 @@
+{
+  "cpu_seconds_total": 1.26,
+  "db_count_runs_p50_ms": 0.006,
+  "db_count_runs_p95_ms": 0.01,
+  "host": {
+    "cpu_count": 16,
+    "cpu_model": "13th Gen Intel(R) Core(TM) i5-13450HX",
+    "machine": "x86_64",
+    "system": "Linux"
+  },
+  "memory_rss_kb": 80472,
+  "mode": "local_synthetic",
+  "regression_rule": "route p95 <= max(3 x baseline p95, baseline p95 + 25 ms); route error rate 0%; startup <= max(2 x baseline, baseline + 2000 ms); RSS <= 1.5 x baseline. Multipliers absorb loopback scheduling noise observed between repeated local runs; they detect order-of-magnitude regressions only and are not customer latency objectives.",
+  "routes": {
+    "message": {
+      "concurrency": 3,
+      "error_percent": 0.0,
+      "p50_ms": 33.086,
+      "p95_ms": 172.345,
+      "p99_ms": 337.621,
+      "requests": 15,
+      "throughput_per_second": 39.493
+    },
+    "ready": {
+      "concurrency": 4,
+      "error_percent": 0.0,
+      "p50_ms": 3.53,
+      "p95_ms": 5.48,
+      "p99_ms": 5.872,
+      "requests": 40,
+      "throughput_per_second": 1008.054
+    },
+    "usage": {
+      "concurrency": 4,
+      "error_percent": 0.0,
+      "p50_ms": 15.282,
+      "p95_ms": 31.502,
+      "p99_ms": 34.931,
+      "requests": 40,
+      "throughput_per_second": 229.16
+    }
+  },
+  "startup_ms": 730.814
+}

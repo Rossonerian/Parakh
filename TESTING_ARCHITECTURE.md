@@ -13,8 +13,8 @@ Parakh is the orchestration/evidence home; Karmi keeps its native `scripts/tasks
 | L4 E2E | `e2e` | Karmi FastAPI and owned PWA existing E2E; Parakh offline full-pipeline demo. Running tests does not establish a browser journey or production authentication. |
 | L5 device | `mobile-smoke`, `mobile-e2e` | Candidate-matched debug/profile APK on physical device, adb-reverse or constrained private LAN, human-observed flows; each step carries a status and artifact. Device absence/provenance mismatch BLOCKED. |
 | L6 resilience | `resilience` | Failures injected only in disposable local services; verify recovery, no duplicate action or route promotion and honest unknown outcomes. No destructive shared DB operations. |
-| L7 security | `security` | Native secret scan + checked configs + negative auth/authorization/contract checks; separate vulnerability database freshness and production approval. Scan results never include credential matches in logs. |
-| L8 performance | `performance` | Measured sample counts, p50/p95/p99 and error rate, DB/CPU/memory/startup, exact device/build/workload; thresholds must have approved source. Local performance ≠ production SLO. |
+| L7 security | `security` | Native secret scan + checked configs + negative auth/authorization/contract checks; tracked-secret signatures with fingerprint-pinned fixtures; OSV known-vulnerability audit of Karmi Python/Pub locks and Parakh's installed runtime (offline = BLOCKED). Scan results never include credential matches in logs. |
+| L8 performance | `performance` | Disposable Karmi: startup, `/ready`, authenticated `/v1/messages`, `/v1/usage` p50/p95/p99, throughput, error %, DB latency, RSS, CPU; compared with a committed measured baseline under a documented regression rule. Local limits ≠ production SLO (owner gate `SLO_APPROVAL`). |
 | L9 release | `production-check`, `release-check` | Validate evidence on both exact SHAs, all mandatory gates and config/rollback/provider/channel/security/device approvals. Missing/blocked/not-run yields `production_ready: false`; never set `PRODUCTION` automatically. |
 
 ## Evidence format

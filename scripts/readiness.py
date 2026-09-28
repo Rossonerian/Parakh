@@ -24,7 +24,7 @@ ENGINEERING_GATES = (
     "PRODUCTION_CONFIG", "ROLLBACK",
 )
 # Owner/external acceptance: cannot be produced by local automation.
-EXTERNAL_GATES = ("REAL_IDENTITY", "PAID_PROVIDER", "BILLING", "CHANNEL_ELIGIBILITY", "DEPLOYMENT")
+EXTERNAL_GATES = ("REAL_IDENTITY", "PAID_PROVIDER", "BILLING", "CHANNEL_ELIGIBILITY", "SLO_APPROVAL", "DEPLOYMENT")
 GATES = ENGINEERING_GATES + EXTERNAL_GATES
 # PRODUCTION is listed for completeness but is never returned by release_state().
 RELEASE_STATES = ("DEVELOPMENT", "TESTING", "CANDIDATE", "RELEASE_READY", "PRODUCTION")
@@ -343,13 +343,14 @@ class Runner:
         self.native("SECURITY", "parakh-provider-and-import-safety", ROOT,
                     ["-m", "pytest", "-q", "tests/test_provider_safety.py", "tests/test_telemetry_import.py"])
         self.external("SECURITY", "security-probes", "security_probe.py", "--karmi", str(self.karmi), "--output", str(self.output))
-        self.record("SECURITY", "dependency-vulnerability-db", "BLOCKED",
-                    "No locally provisioned vulnerability advisory database or approved network audit")
+        # Network query of names/versions only; offline -> BLOCKED with evidence, never PASS.
+        self.external("SECURITY", "dependency-vulnerabilities", "dependency_audit.py", "--karmi", str(self.karmi),
+                      "--output", str(self.output), blocked_evidence=self.output / "dependency-audit.json")
 
     def performance(self) -> None:
-        self.external("PERFORMANCE", "local-performance", "performance_probe.py", "--karmi", str(self.karmi), "--output", str(self.output))
-        self.record("PERFORMANCE", "approved-thresholds", "BLOCKED",
-                    "Local measurements are not approved production performance thresholds")
+        extra = ("--accept-baseline",) if self.accept_baseline else ()
+        self.external("PERFORMANCE", "local-regression", "performance_probe.py", "--karmi", str(self.karmi),
+                      "--output", str(self.output), *extra, blocked_evidence=self.output / "performance.json")
 
     def resilience(self) -> None:
         self.external("RESILIENCE", "failure-injection", "resilience_probe.py", "--karmi", str(self.karmi), "--output", str(self.output))
@@ -378,6 +379,7 @@ class Runner:
             ("PAID_PROVIDER", "Real model/action quality and cost budgets not approved or measured"),
             ("BILLING", "Real payment lifecycle and financial reconciliation not approved or verified"),
             ("CHANNEL_ELIGIBILITY", "WhatsApp eligibility unresolved for intended market; channel remains disabled"),
+            ("SLO_APPROVAL", "No owner-approved production latency/throughput objectives; local limits only detect regressions"),
             ("DEPLOYMENT", "No authorized deployed candidate with observed health, telemetry and TLS"),
         ):
             self.record(gate, "external-acceptance", "BLOCKED", reason)
@@ -466,10 +468,11 @@ def main() -> int:
     parser.add_argument("--production-env", type=Path,
                         help="explicit private deployment-candidate env file (values never stored in evidence)")
     parser.add_argument("--accept-baseline", action="store_true",
-                        help=f"benchmark only: rewrite {BASELINE} from this run (review and commit it)")
+                        help="benchmark/performance only: rewrite the measured baseline from this run "
+                             "(review and commit it); the gate reports NOT_RUN/BLOCKED for that run")
     args = parser.parse_args()
-    if args.accept_baseline and args.command != "benchmark":
-        parser.error("--accept-baseline is only valid with the benchmark command")
+    if args.accept_baseline and args.command not in {"benchmark", "performance"}:
+        parser.error("--accept-baseline is only valid with the benchmark or performance command")
     output = args.output or ROOT / "test-results" / (datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8])
     runner = Runner(args.command, args.karmi.resolve(), output.resolve(),
                     args.mobile_evidence.resolve() if args.mobile_evidence else None,
