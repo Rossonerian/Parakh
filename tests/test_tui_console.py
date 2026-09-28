@@ -60,6 +60,7 @@ def test_missing_suite_is_reported_not_fatal(tmp_path):
         app = ParakhApp(data_dir=tmp_path, suite_path=tmp_path / "missing.jsonl", poll_seconds=0.1)
         async with app.run_test(size=(160, 50)) as pilot:
             await _until(pilot, lambda: app.state is not None)
+            assert app.state is not None
             assert "N/A" in _text(app.query_one("#dash-workspace"))
             assert app.state.snapshot.health["offline_ready"] is False
     run(scenario())
@@ -71,12 +72,14 @@ def test_live_run_progress_completion_and_event_log(tmp_path):
         async with app.run_test(size=(160, 50)) as pilot:
             await _until(pilot, lambda: app.state is not None)
             app.start_action("fake run", lambda: lab_actions.run_fake(tmp_path, SUITE, max_cases=12, pacing_seconds=0.05), str)
-            await _until(pilot, lambda: bool(app.state.snapshot.active) and app.state.snapshot.active[0].completed >= 1)
+            await _until(pilot, lambda: app.state is not None and bool(app.state.snapshot.active) and app.state.snapshot.active[0].completed >= 1)
+            assert app.state is not None
             active = app.state.snapshot.active[0]
             assert 1 <= active.completed < active.total == 12
-            assert "Active execution" in app.query_one("#dash-active").border_title
+            assert "Active execution" in (app.query_one("#dash-active").border_title or "")
             assert "running" in _text(app.query_one("#statusbar"))
-            await _until(pilot, lambda: "fake run" not in app.busy and not app.state.snapshot.active and app.state.snapshot.runs[0].status == "completed")
+            await _until(pilot, lambda: "fake run" not in app.busy and app.state is not None and not app.state.snapshot.active and bool(app.state.snapshot.runs) and app.state.snapshot.runs[0].status == "completed")
+            assert app.state is not None
             run_summary = app.state.snapshot.runs[0]
             assert run_summary.cases_attempted == 12 and run_summary.graded == 12
             await pilot.press("l")  # RichLog renders once its tab is laid out
@@ -102,6 +105,7 @@ def test_failed_run_and_long_labels_render(tmp_path):
             await pilot.press("9")
             await pilot.pause(0.2)
             assert app.query_one("#review-table", DataTable).row_count == 3
+            assert app.state is not None
             app.query_one(DashboardView).show(app.state)  # rendering the long label must not raise
     run(scenario())
 
@@ -164,6 +168,6 @@ def test_run_selection_survives_background_refreshes(tmp_path):
             stale = build_state(tmp_path, SUITE, SuiteCache(), selected_run_id=second)
             app.apply_state(stale, app._applied + 1)
             assert app.selected_run_id == first
-            await _until(pilot, lambda: app.state.selected_run is not None and app.state.selected_run.run_id == first)
+            await _until(pilot, lambda: app.state is not None and app.state.selected_run is not None and app.state.selected_run.run_id == first)
             assert first in _text(app.query_one("#run-meta"))
     run(scenario())

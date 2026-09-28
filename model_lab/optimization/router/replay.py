@@ -90,7 +90,7 @@ def frontier_migration(
         costs_known = all(a in cost_by_action for a, p in (*cand_actions.items(), *base_actions.items()) if p > 0)
         cand_cost = sum(p * cost_by_action[a] for a, p in cand_actions.items()) if costs_known else None
         base_cost = sum(p * cost_by_action[a] for a, p in base_actions.items()) if costs_known else None
-        shifted_to_cheaper = cand_cost < base_cost if costs_known else None
+        shifted_to_cheaper = (cand_cost < base_cost) if (costs_known and cand_cost is not None and base_cost is not None) else None
 
         per_domain[d] = {
             "shifted_to_cheaper": shifted_to_cheaper,

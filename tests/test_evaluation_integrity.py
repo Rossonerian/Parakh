@@ -10,7 +10,7 @@ from model_lab.schemas import Attempt, AttemptStatus, Grade, ModelConfig, utc_no
 ROOT = __import__("pathlib").Path(__file__).parents[1]
 
 
-def _attempt(case_id, model="m", text="{}", status=AttemptStatus.SUCCESS):
+def _attempt(case_id: str, model: str = "m", text: str | None = "{}", status: AttemptStatus = AttemptStatus.SUCCESS) -> Attempt:
     return Attempt(
         attempt_id=f"{model}-{case_id}-{status.value}", run_id="run", logical_request_id=f"logical-{case_id}",
         case_id=case_id, model_config=ModelConfig(provider="fixture", model=model), prompt_hash="c" * 16,

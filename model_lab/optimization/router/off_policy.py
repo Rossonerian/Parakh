@@ -5,7 +5,7 @@ IPS, SNIPS, Direct Method, and Doubly Robust estimators, with strict
 support and variance warnings.
 """
 
-from typing import Any, Sequence
+from typing import Any, Mapping, Sequence
 import random
 
 from model_lab.optimization.router.linucb import fit
@@ -32,7 +32,7 @@ def _bootstrap_ci(values, weights, seed, bootstrap) -> tuple[float | None, float
 
 def evaluate(
     policy: Any,
-    examples: Sequence[dict[str, Any]],
+    examples: Sequence[Mapping[str, Any]],
     *,
     reward_key: str = "reward",
     seed: int = 0,
@@ -188,17 +188,17 @@ def evaluate(
         "reliable": len(warnings) == 0
     }
 
-def on_policy_value(examples: Sequence[dict[str, Any]], *, seed: int = 0, bootstrap: int = 500) -> dict[str, Any]:
+def on_policy_value(examples: Sequence[Mapping[str, Any]], *, seed: int = 0, bootstrap: int = 500) -> dict[str, Any]:
     """Value of the logging policy on its own data: the plain mean reward (exact, no weighting)."""
     n = len(examples)
     if n == 0:
         return {"n": 0, "value": None, "bootstrap_ci": [None, None]}
-    rewards = [ex["reward"] for ex in examples]
+    rewards = [float(ex["reward"]) for ex in examples]
     ci_lower, ci_upper = _bootstrap_ci(rewards, [1.0] * n, seed, bootstrap)
     return {"n": n, "value": sum(rewards) / n, "bootstrap_ci": [ci_lower, ci_upper]}
 
 
-def paired_difference(policy: Any, examples: Sequence[dict[str, Any]], *, margin: float, reward_key: str = "reward",
+def paired_difference(policy: Any, examples: Sequence[Mapping[str, Any]], *, margin: float, reward_key: str = "reward",
                       seed: int = 0, resamples: int = 400, confidence: float = 0.95) -> dict[str, Any]:
     """Non-inferiority of ``policy`` against the logging policy on the same logged examples.
 

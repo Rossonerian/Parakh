@@ -25,7 +25,14 @@ def _attempt(record: dict[str, Any], run_id: str, expected_model: ModelConfig | 
     missing = sorted(required - record.keys())
     if missing:
         raise ValidationError("missing import fields: " + ", ".join(missing))
-    model_data = record.get("model_config") or ({"provider": record.get("provider"), "model": record.get("model")} if record.get("provider") and record.get("model") else None)
+    model_config_raw = record.get("model_config")
+    model_data: dict[str, Any] | None
+    if isinstance(model_config_raw, dict):
+        model_data = dict(model_config_raw)
+    elif record.get("provider") and record.get("model"):
+        model_data = {"provider": record["provider"], "model": record["model"]}
+    else:
+        model_data = None
     if model_data is None:
         if expected_model is None:
             raise ValidationError("provider/model metadata is required")

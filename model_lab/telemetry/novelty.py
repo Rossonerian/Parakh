@@ -14,7 +14,7 @@ from typing import Any, Mapping, Sequence
 
 from model_lab.optimization.router.features import extract
 from model_lab.storage.evidence import EvidenceStore
-from model_lab.telemetry.schema import RunRecord
+from model_lab.telemetry.schema import ModelInfo, RunRecord
 
 
 @dataclass(frozen=True)
@@ -68,7 +68,7 @@ class NoveltyContext:
         trajs = evidence.list("trajectories")
         for traj in trajs:
             run_id = traj.get("run_id")
-            action = run_actions.get(run_id)
+            action = run_actions.get(str(run_id)) if run_id else None
             outcome = traj.get("final_outcome", {})
             if action and isinstance(outcome, Mapping):
                 cost = outcome.get("final_cost")
@@ -106,7 +106,7 @@ class NoveltyContext:
         if isinstance(latency, (int, float)) and not isinstance(latency, bool):
             self.latencies_by_action[action].append(float(latency))
 
-    def register_model_catalog(self, catalog: Sequence[Mapping[str, Any]]) -> None:
+    def register_model_catalog(self, catalog: Sequence[Mapping[str, Any] | ModelInfo]) -> None:
         """Register model info entries into the registry."""
         for m in catalog:
             provider = m.get("provider") if isinstance(m, Mapping) else getattr(m, "provider", None)

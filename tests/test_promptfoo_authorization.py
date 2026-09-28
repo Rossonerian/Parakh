@@ -1,3 +1,4 @@
+from typing import Any
 import pytest
 from model_lab.domain.isolation import AuthorizedLiveExecution
 from model_lab.errors import PilotBlockedError
@@ -13,17 +14,20 @@ candidates = [case.candidate_payload() for case in suite.cases[:1]]
 valid_manifest = export_promptfoo_manifest(candidates, run_id="r")
 
 def test_promptfoo_no_authorization():
+    kwargs: dict[str, Any] = {"runner": dummy_runner}
     with pytest.raises(TypeError):
-        invoke_promptfoo(valid_manifest, runner=dummy_runner)
+        invoke_promptfoo(valid_manifest, **kwargs)
 
 def test_promptfoo_forged_boolean():
+    kwargs1: dict[str, Any] = {"approved_plan": True, "runner": dummy_runner}
     with pytest.raises(TypeError):
         # We can't even pass approved_plan anymore, it throws TypeError
-        invoke_promptfoo(valid_manifest, approved_plan=True, runner=dummy_runner)
+        invoke_promptfoo(valid_manifest, **kwargs1)
         
+    kwargs2: dict[str, Any] = {"capability": True, "runner": dummy_runner}
     with pytest.raises(PromptfooImportError, match="requires an approved plan"):
         # We try to forge the capability argument with a bool instead of object
-        invoke_promptfoo(valid_manifest, capability=True, runner=dummy_runner)
+        invoke_promptfoo(valid_manifest, **kwargs2)
 
 def test_promptfoo_invalid_artifact():
     plan = {"immutable": True, "execution": {"concurrency": 2}}
@@ -43,6 +47,7 @@ def test_fake_to_live_prevention():
 
 def test_direct_helper_invocation():
     # Direct runner is required to take the manifest, but you still need the capability
+    kwargs: dict[str, Any] = {"runner": dummy_runner}
     with pytest.raises(TypeError):
-        invoke_promptfoo(valid_manifest, runner=dummy_runner)
+        invoke_promptfoo(valid_manifest, **kwargs)
 

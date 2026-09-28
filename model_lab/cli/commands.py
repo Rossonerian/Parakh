@@ -6,6 +6,7 @@ import argparse
 import json
 from pathlib import Path
 import sys
+from typing import Any
 
 from model_lab.application.execution import ExecutionEngine
 from model_lab.application.reporting import write_report_bundle
@@ -30,7 +31,7 @@ from model_lab.pilot import (
 from model_lab.promptfoo import export_promptfoo_manifest, import_promptfoo_fixture
 from model_lab.providers.fake import FakeProvider
 from model_lab.review import export_blind_review, import_blind_reviews, review_bindings
-from model_lab.schemas import Budget, ModelConfig, Run, utc_now
+from model_lab.schemas import Attempt, Budget, Grade, ModelConfig, Run, Suite, utc_now
 from model_lab.storage import SQLiteStore
 from model_lab.cli import optimization
 
@@ -180,12 +181,12 @@ def _print_json(value: object) -> None:
     print(json.dumps(value, ensure_ascii=False, sort_keys=True, indent=2))
 
 
-def _run_rows(suite: object, store: SQLiteStore, run_id: str) -> tuple[list[object], list[object], list[dict[str, object]]]:
+def _run_rows(suite: Suite, store: SQLiteStore, run_id: str) -> tuple[list[Attempt], list[Grade], list[dict[str, Any]]]:
     attempts = store.list_attempts(run_id)
     cases = {case.case_id: case for case in suite.cases}
     grades = [grade_attempt(cases[attempt.case_id], attempt) for attempt in attempts]
     grades_by_attempt = {grade.attempt_id: grade for grade in grades}
-    rows = []
+    rows: list[dict[str, Any]] = []
     for attempt in attempts:
         case = cases[attempt.case_id]
         grade = grades_by_attempt[attempt.attempt_id]

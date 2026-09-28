@@ -311,16 +311,11 @@ def optimize(
 
         # Beam selection by train pass rate (descending, ties broken by candidate_id)
         pool = list(candidates.values())
-        pool.sort(
-            key=lambda c: (
-                -(
-                    train_evals[c.candidate_id].pass_rate
-                    if train_evals[c.candidate_id].pass_rate is not None
-                    else -1.0
-                ),
-                c.candidate_id,
-            )
-        )
+        def _beam_sort_key(c: Any) -> tuple[float, str]:
+            rate = train_evals[c.candidate_id].pass_rate
+            return (-(rate if rate is not None else -1.0), c.candidate_id)
+
+        pool.sort(key=_beam_sort_key)
         current_beam = pool[:beam]
 
     # Evaluate validation split on pool of all candidates

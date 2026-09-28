@@ -16,7 +16,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
-from typing import Any, Iterable, Mapping
+from typing import Any, Iterable, Mapping, Sequence
 
 from model_lab.artifacts import ed25519, signer
 from model_lab.artifacts.provenance import build_provenance, missing_fields
@@ -46,7 +46,7 @@ def _latest_passing_report(evidence: EvidenceStore, candidate_id: str) -> dict[s
     return reports[-1]
 
 
-def _eligibility(dataset_examples: Iterable[Mapping[str, Any]], registry: list[Mapping[str, Any]]) -> dict[str, Any]:
+def _eligibility(dataset_examples: Iterable[Mapping[str, Any]], registry: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
     tiers: dict[str, set[str]] = {}
     for example in dataset_examples:
         tiers.setdefault(example["tier"], set()).update(example["eligible_actions"])

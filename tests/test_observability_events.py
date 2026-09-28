@@ -54,7 +54,8 @@ def test_secrets_are_redacted_before_storage(tmp_path, monkeypatch):
     store.close()
     assert secret not in stored and "abcdef123456789" not in stored
     assert "[REDACTED]" in stored
-    assert redact("x" * 600).endswith("…") and len(redact("x" * 600)) == 500
+    redacted = redact("x" * 600)
+    assert redacted is not None and redacted.endswith("…") and len(redacted) == 500
 
 
 def _attempt(index: int, cost: int | None, currency: str | None) -> Attempt:

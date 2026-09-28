@@ -7,6 +7,7 @@ import pytest
 
 pytest.importorskip("textual")
 
+from textual.coordinate import Coordinate
 from textual.widgets import Button, DataTable, Input, Select
 
 from model_lab.application.observability import DB_NAME
@@ -74,7 +75,8 @@ def test_candidate_review_needs_a_named_operator_and_records_the_role(workspace:
             await _until(pilot, lambda: table.row_count > 0)
             table.move_cursor(row=0)
             await pilot.pause(0.2)
-            view_candidate = app.query_one("#cand-table", DataTable).coordinate_to_cell_key((0, 0)).row_key.value
+            view_candidate = app.query_one("#cand-table", DataTable).coordinate_to_cell_key(Coordinate(0, 0)).row_key.value
+            assert view_candidate is not None
             assert "lineage: run" in str(app.query_one("#cand-detail").render())
             app.query_one("#cand-role", Select).value = "REGRESSION"
             app.query_one("#btn-cand-approve", Button).press()  # no actor/reason yet
@@ -119,7 +121,7 @@ def test_ambiguous_preference_pair_is_classified_then_approved_by_an_operator(wo
             await pilot.press("p")
             table = app.query_one("#pref-table", DataTable)
             await _until(pilot, lambda: table.row_count > 0)
-            keys = [table.coordinate_to_cell_key((i, 0)).row_key.value for i in range(table.row_count)]
+            keys = [table.coordinate_to_cell_key(Coordinate(i, 0)).row_key.value for i in range(table.row_count)]
             table.move_cursor(row=keys.index(waiting[0]))
             await pilot.pause(0.2)
             assert "chosen" in str(app.query_one("#pref-detail").render())

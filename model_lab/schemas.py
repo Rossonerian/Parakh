@@ -96,14 +96,39 @@ def _plain(value: Any) -> Any:
     return value
 
 
-class FrozenDict(dict):
+class FrozenDict(dict[Any, Any]):
     """Detached JSON-compatible immutable record, not an arbitrary-code sandbox."""
-    def _immutable(self, *args, **kwargs):
+    def _immutable(self, *args: Any, **kwargs: Any) -> Any:
         raise TypeError("record mappings are immutable")
-    __setitem__ = __delitem__ = clear = pop = popitem = setdefault = update = __ior__ = _immutable
-    def __copy__(self):
+
+    def __setitem__(self, key: Any, value: Any) -> None:
+        raise TypeError("record mappings are immutable")
+
+    def __delitem__(self, key: Any) -> None:
+        raise TypeError("record mappings are immutable")
+
+    def clear(self) -> None:
+        raise TypeError("record mappings are immutable")
+
+    def pop(self, *args: Any, **kwargs: Any) -> Any:
+        raise TypeError("record mappings are immutable")
+
+    def popitem(self) -> Any:
+        raise TypeError("record mappings are immutable")
+
+    def setdefault(self, *args: Any, **kwargs: Any) -> Any:
+        raise TypeError("record mappings are immutable")
+
+    def update(self, *args: Any, **kwargs: Any) -> None:
+        raise TypeError("record mappings are immutable")
+
+    def __ior__(self, other: Any) -> Any:
+        raise TypeError("record mappings are immutable")
+
+    def __copy__(self) -> FrozenDict:
         return self
-    def __deepcopy__(self, memo):
+
+    def __deepcopy__(self, memo: Any) -> FrozenDict:
         return self
 
 
@@ -328,7 +353,7 @@ class Run:
     budget: Budget
     started_at: str
     status: str = "created"
-    environment: dict[str, str] = field(default_factory=dict)
+    environment: dict[str, Any] = field(default_factory=dict)
     prompt_hashes: dict[str, str] = field(default_factory=dict)
 
     def __post_init__(self) -> None:

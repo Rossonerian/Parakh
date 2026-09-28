@@ -135,7 +135,11 @@ class ExecutionEngine:
             # the final retry: all retry costs must be known before an exact
             # settlement can replace the conservative reservation.
             retry_costs = [attempt.cost_minor for attempt in logical_attempts]
-            actual_cost = sum(retry_costs) if retry_costs and all(cost is not None for cost in retry_costs) else None
+            actual_cost = (
+                sum(cost for cost in retry_costs if cost is not None)
+                if retry_costs and all(cost is not None for cost in retry_costs)
+                else None
+            )
             self.budgets.settle(reservation, actual_cost_minor=actual_cost)
         current = self.store.get_run(run.run_id)
         if current.status == "running":

@@ -150,11 +150,9 @@ def test_parse_batch_never_mutates_source():
     assert batch == before
 
 
-def _contract(name):
+def _contract(name: str):
     import json
-    import sys
-    sys.path.insert(0, str(ROOT / "contracts"))
-    import schema_check
+    from contracts import schema_check
     return schema_check, json.loads((ROOT / "contracts" / name).read_text(encoding="utf-8"))
 
 

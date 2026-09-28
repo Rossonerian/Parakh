@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -172,8 +173,9 @@ def test_promptfoo_import_rejects_duplicate_and_unknown_case_ids() -> None:
 def test_promptfoo_live_invocation_fails_closed() -> None:
     manifest = export_promptfoo_manifest(_candidate_cases(), run_id="run-1")
 
+    kwargs: dict[str, Any] = {}
     with pytest.raises(TypeError):
-        invoke_promptfoo(manifest)
+        invoke_promptfoo(manifest, **kwargs)
 
     from model_lab.domain.isolation import AuthorizedLiveExecution
     cap = AuthorizedLiveExecution("validhash", "cli")

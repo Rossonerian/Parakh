@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -78,7 +79,7 @@ def test_dedupe_exact_key_invariance() -> None:
     run = parsed.valid[0]
 
     # Mutate timestamps, run_id, request_id, decision_id, attempt_id
-    mutated_raw = copy.deepcopy(run.raw)
+    mutated_raw: dict[str, Any] = dict(copy.deepcopy(run.raw))
     mutated_raw["run_id"] = "srun-different-id"
     mutated_raw["request_id"] = "req-different-id"
     mutated_raw["started_at"] = "2026-09-05T00:00:00Z"

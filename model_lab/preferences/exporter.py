@@ -68,9 +68,10 @@ def readiness(
     approved_count = 0
 
     for pair in all_pairs:
-        pair_id = pair["pair_id"]
-        state = states.get(pair_id, pair.get("approval_state", "UNKNOWN"))
-        category = pair.get("category", "unknown")
+        pair_id = str(pair["pair_id"])
+        raw_state = states.get(pair_id) if pair_id in states else pair.get("approval_state", "UNKNOWN")
+        state = str(raw_state or "UNKNOWN")
+        category = str(pair.get("category") or "unknown")
 
         counts_by_state[state] = counts_by_state.get(state, 0) + 1
         counts_by_category[category] = counts_by_category.get(category, 0) + 1

@@ -343,8 +343,12 @@ def _harness_gates(evidence: EvidenceStore, harness_candidate_id: str, suite: An
         results[label] = evaluation.pass_rate
         details["evidence_class"] = evaluation.evidence_class
     details["holdout"] = results
-    ok = (None not in validation.values() and validation["candidate"] >= validation["baseline"]
-          and None not in results.values() and results["candidate"] >= results["baseline"] - config.harness_holdout_margin)
+    vc, vb = validation.get("candidate"), validation.get("baseline")
+    rc, rb = results.get("candidate"), results.get("baseline")
+    ok = (
+        vc is not None and vb is not None and vc >= vb
+        and rc is not None and rb is not None and rc >= rb - config.harness_holdout_margin
+    )
     if None in results.values():
         reason = ("no deterministically graded holdout case: the sealed holdout is rubric-only, so harness holdout "
                   "evidence needs blind human review of the candidate's outputs")
@@ -373,8 +377,9 @@ def _empirical_static_policy(dataset: Any):
 
     def choose(context: Mapping[str, Any], eligible: Sequence[str]) -> str | None:
         for table in (counts.get((context["tier"], context["task_domain"])), tier_counts.get(context["tier"])):
-            if table:
-                ranked = sorted((a for a in table if a in eligible), key=lambda a: (-table[a], a))
+            if table is not None:
+                t = table
+                ranked = sorted((a for a in t if a in eligible), key=lambda a: (-t[a], a))
                 if ranked:
                     return ranked[0]
         return sorted(eligible)[0] if eligible else None

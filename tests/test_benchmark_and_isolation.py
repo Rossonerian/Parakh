@@ -1,3 +1,4 @@
+from typing import Any
 import json
 from pathlib import Path
 
@@ -9,6 +10,10 @@ from model_lab.domain.isolation import assert_candidate_safe, candidate_input
 
 
 ROOT = Path(__file__).parents[1]
+
+
+def _set_item(mapping: Any, key: Any, value: Any) -> None:
+    mapping[key] = value
 
 
 def test_seed_suite_validates_with_expected_shape():
@@ -34,7 +39,7 @@ def test_candidate_projection_is_immutable():
     case = load_suite(ROOT / "benchmarks/seed_cases.jsonl").cases[0]
     projected = candidate_input(case)
     with pytest.raises(TypeError):
-        projected.limits["max_tool_calls"] = 99
+        _set_item(projected.limits, "max_tool_calls", 99)
     with pytest.raises(AttributeError):
         _ = projected.evaluation
 

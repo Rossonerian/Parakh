@@ -15,6 +15,7 @@ class CandidateInput:
     """Immutable candidate input with no access to protected evaluation data."""
 
     __slots__ = ("_payload",)
+    _payload: MappingProxyType[str, Any]
 
     def __init__(self, case: Case):
         payload = case.candidate_payload()
@@ -22,19 +23,19 @@ class CandidateInput:
 
     @property
     def case_id(self) -> str:
-        return self._payload["case_id"]
+        return str(self._payload["case_id"])
 
     @property
-    def messages(self) -> tuple[MappingProxyType, ...]:
-        return self._payload["messages"]
+    def messages(self) -> tuple[MappingProxyType[Any, Any], ...]:
+        return tuple(self._payload["messages"])
 
     @property
-    def limits(self) -> MappingProxyType:
+    def limits(self) -> MappingProxyType[Any, Any]:
         return self._payload["limits"]
 
     @property
     def prompt_hash(self) -> str:
-        return self._payload["prompt_hash"]
+        return str(self._payload["prompt_hash"])
 
     def to_dict(self) -> dict[str, Any]:
         # MappingProxyType is deliberately not pickle/deepcopy-able. Rebuild a

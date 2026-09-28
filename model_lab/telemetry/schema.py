@@ -265,7 +265,7 @@ def parse_run(raw: Any, index: int, batch_feature_schema: str) -> RunRecord | In
         if _is(context.get(name), int) and context[name] < 0:
             errors.append(f"routing_context.negative_{name}")
     ratio = context.get("context_utilization_ratio")
-    if _is(ratio, (int, float)) and not 0 <= ratio <= 1:
+    if isinstance(ratio, (int, float)) and not 0 <= ratio <= 1:
         errors.append("routing_context.ratio_out_of_range")
     if context and (context.get("tier") != raw.get("tier") or context.get("task_domain") != raw.get("task_domain")):
         errors.append("routing_context.run_mismatch")
@@ -310,6 +310,7 @@ def parse_run(raw: Any, index: int, batch_feature_schema: str) -> RunRecord | In
 
     if errors:
         return InvalidRun(index, run_id, tuple(dict.fromkeys(errors)), raw)
+    assert run_id is not None
     return RunRecord(
         run_id=run_id, request_id=raw["request_id"], session_id_hash=raw.get("session_id_hash"),
         started_at=raw["started_at"], completed_at=raw.get("completed_at"), task_domain=raw["task_domain"], tier=raw["tier"],
@@ -340,6 +341,10 @@ def parse_batch(batch: Any) -> ParsedBatch:
     feature_schema = batch.get("feature_schema_version")
     if not _text(feature_schema):
         raise TelemetryBatchError("feature_schema_version is required")
+    assert isinstance(feature_schema, str)
+    assert isinstance(batch_id, str)
+    assert isinstance(version, str)
+    assert isinstance(producer["repo"], str) and isinstance(producer["version"], str)
     window = batch.get("window") or {}
     if not isinstance(window, Mapping):
         raise TelemetryBatchError("window must be an object")

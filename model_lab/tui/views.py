@@ -7,6 +7,7 @@ from typing import Any, Iterable, Sequence
 
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
+from textual.coordinate import Coordinate
 from textual.widgets import Button, DataTable, Input, Select, Static
 
 from model_lab.application.observability import BreakdownRow
@@ -32,7 +33,7 @@ def sync_table(table: DataTable, rows: Sequence[tuple[str, Sequence[Any]]]) -> N
     table._signature = signature  # type: ignore[attr-defined]
     current = None
     if table.row_count and table.cursor_row is not None and 0 <= table.cursor_row < table.row_count:
-        current = table.coordinate_to_cell_key((table.cursor_row, 0)).row_key.value
+        current = table.coordinate_to_cell_key(Coordinate(table.cursor_row, 0)).row_key.value
     table.clear()
     for key, cells in rows:
         table.add_row(*cells, key=key)

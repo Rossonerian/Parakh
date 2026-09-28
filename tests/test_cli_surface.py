@@ -35,19 +35,22 @@ def test_operational_cli_surface(tmp_path: Path):
 
 
 def test_cli_subcommand_help_descriptions():
+    import argparse
     from model_lab.cli import build_parser
 
     parser = build_parser()
-    subparsers = parser._subparsers._group_actions[0].choices
+    subparsers_action = next(a for a in parser._actions if isinstance(a, argparse._SubParsersAction))
+    choices = subparsers_action.choices
+    assert choices is not None
 
-    init_help = subparsers["init"].format_help()
+    init_help = choices["init"].format_help()
     assert "workspace directory path" in init_help
 
-    run_help = subparsers["run"].format_help()
+    run_help = choices["run"].format_help()
     assert "path to benchmark suite file" in run_help
     assert "output directory for run artifacts" in run_help
 
-    demo_help = subparsers["demo"].format_help()
+    demo_help = choices["demo"].format_help()
     assert "random seed for demo evaluation" in demo_help
 
 

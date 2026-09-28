@@ -222,12 +222,14 @@ class SQLiteStore:
             "INSERT INTO run_events(run_id, timestamp, event_type, record_json) VALUES (?, ?, ?, ?)",
             (event.run_id, event.timestamp, event.event_type, json.dumps(record, sort_keys=True)),
         )
+        assert cursor.lastrowid is not None
         return int(cursor.lastrowid)
 
     @synchronized
     def list_events(self, *, run_id: str | None = None, after_id: int = 0, limit: int = 500) -> list[RunEvent]:
         """Newest ``limit`` events with id > ``after_id``, returned oldest first."""
-        where, params = "event_id > ?", [after_id]
+        where = "event_id > ?"
+        params: list[Any] = [after_id]
         if run_id is not None:
             where += " AND run_id = ?"
             params.append(run_id)

@@ -39,6 +39,7 @@ class FakeProvider:
         self.capabilities = ProviderCapabilities(self.name, self.model, supports_streaming=False, supports_tools=False, context_window=32768, pricing_known=False)
 
     def generate(self, request: ProviderRequest) -> ProviderResponse:
+        assert isinstance(self.variant, FakeVariant)
         case_id = request.candidate.case_id
         call = self._calls.get(case_id, 0) + 1
         if self.delay_seconds:
