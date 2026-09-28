@@ -1,0 +1,499 @@
+{
+  "cases": 60,
+  "comparison": {
+    "by_complexity": {
+      "1": {
+        "delta": 1.0,
+        "left_n": 6,
+        "left_score": 1.0,
+        "n": 15,
+        "right_n": 6,
+        "right_score": 0.0
+      },
+      "2": {
+        "delta": 1.0,
+        "left_n": 4,
+        "left_score": 1.0,
+        "n": 15,
+        "right_n": 4,
+        "right_score": 0.0
+      },
+      "3": {
+        "delta": null,
+        "left_n": 0,
+        "left_score": null,
+        "n": 15,
+        "right_n": 0,
+        "right_score": null
+      },
+      "4": {
+        "delta": null,
+        "left_n": 0,
+        "left_score": null,
+        "n": 15,
+        "right_n": 0,
+        "right_score": null
+      }
+    },
+    "by_domain": {
+      "ambiguity": {
+        "delta": null,
+        "left_n": 0,
+        "left_score": null,
+        "n": 4,
+        "right_n": 0,
+        "right_score": null
+      },
+      "automation": {
+        "delta": 1.0,
+        "left_n": 1,
+        "left_score": 1.0,
+        "n": 4,
+        "right_n": 1,
+        "right_score": 0.0
+      },
+      "calendar": {
+        "delta": null,
+        "left_n": 0,
+        "left_score": null,
+        "n": 4,
+        "right_n": 0,
+        "right_score": null
+      },
+      "communication": {
+        "delta": null,
+        "left_n": 0,
+        "left_score": null,
+        "n": 4,
+        "right_n": 0,
+        "right_score": null
+      },
+      "conversation_memory": {
+        "delta": 1.0,
+        "left_n": 1,
+        "left_score": 1.0,
+        "n": 4,
+        "right_n": 1,
+        "right_score": 0.0
+      },
+      "document_extraction": {
+        "delta": 1.0,
+        "left_n": 2,
+        "left_score": 1.0,
+        "n": 4,
+        "right_n": 2,
+        "right_score": 0.0
+      },
+      "expenses": {
+        "delta": 1.0,
+        "left_n": 2,
+        "left_score": 1.0,
+        "n": 4,
+        "right_n": 2,
+        "right_score": 0.0
+      },
+      "multilingual": {
+        "delta": null,
+        "left_n": 0,
+        "left_score": null,
+        "n": 4,
+        "right_n": 0,
+        "right_score": null
+      },
+      "privacy": {
+        "delta": 1.0,
+        "left_n": 1,
+        "left_score": 1.0,
+        "n": 4,
+        "right_n": 1,
+        "right_score": 0.0
+      },
+      "shopping": {
+        "delta": null,
+        "left_n": 0,
+        "left_score": null,
+        "n": 4,
+        "right_n": 0,
+        "right_score": null
+      },
+      "source_reasoning": {
+        "delta": null,
+        "left_n": 0,
+        "left_score": null,
+        "n": 4,
+        "right_n": 0,
+        "right_score": null
+      },
+      "support": {
+        "delta": null,
+        "left_n": 0,
+        "left_score": null,
+        "n": 4,
+        "right_n": 0,
+        "right_score": null
+      },
+      "tabular_analysis": {
+        "delta": 1.0,
+        "left_n": 1,
+        "left_score": 1.0,
+        "n": 4,
+        "right_n": 1,
+        "right_score": 0.0
+      },
+      "task_planning": {
+        "delta": 1.0,
+        "left_n": 1,
+        "left_score": 1.0,
+        "n": 4,
+        "right_n": 1,
+        "right_score": 0.0
+      },
+      "travel": {
+        "delta": 1.0,
+        "left_n": 1,
+        "left_score": 1.0,
+        "n": 4,
+        "right_n": 1,
+        "right_score": 0.0
+      }
+    },
+    "by_split": {
+      "calibration": {
+        "delta": 1.0,
+        "left_n": 3,
+        "left_score": 1.0,
+        "n": 12,
+        "right_n": 3,
+        "right_score": 0.0
+      },
+      "holdout": {
+        "delta": null,
+        "left_n": 0,
+        "left_score": null,
+        "n": 12,
+        "right_n": 0,
+        "right_score": null
+      },
+      "train": {
+        "delta": 1.0,
+        "left_n": 7,
+        "left_score": 1.0,
+        "n": 36,
+        "right_n": 7,
+        "right_score": 0.0
+      }
+    },
+    "by_workflow": {
+      "ambiguity-workflow-family-v1": {
+        "delta": null,
+        "left_n": 0,
+        "left_score": null,
+        "n": 4,
+        "right_n": 0,
+        "right_score": null
+      },
+      "automation-workflow-family-v1": {
+        "delta": 1.0,
+        "left_n": 1,
+        "left_score": 1.0,
+        "n": 4,
+        "right_n": 1,
+        "right_score": 0.0
+      },
+      "calendar-workflow-family-v1": {
+        "delta": null,
+        "left_n": 0,
+        "left_score": null,
+        "n": 4,
+        "right_n": 0,
+        "right_score": null
+      },
+      "communication-workflow-family-v1": {
+        "delta": null,
+        "left_n": 0,
+        "left_score": null,
+        "n": 4,
+        "right_n": 0,
+        "right_score": null
+      },
+      "conversation_memory-workflow-family-v1": {
+        "delta": 1.0,
+        "left_n": 1,
+        "left_score": 1.0,
+        "n": 4,
+        "right_n": 1,
+        "right_score": 0.0
+      },
+      "document_extraction-workflow-family-v1": {
+        "delta": 1.0,
+        "left_n": 2,
+        "left_score": 1.0,
+        "n": 4,
+        "right_n": 2,
+        "right_score": 0.0
+      },
+      "expenses-workflow-family-v1": {
+        "delta": 1.0,
+        "left_n": 2,
+        "left_score": 1.0,
+        "n": 4,
+        "right_n": 2,
+        "right_score": 0.0
+      },
+      "multilingual-workflow-family-v1": {
+        "delta": null,
+        "left_n": 0,
+        "left_score": null,
+        "n": 4,
+        "right_n": 0,
+        "right_score": null
+      },
+      "privacy-workflow-family-v1": {
+        "delta": 1.0,
+        "left_n": 1,
+        "left_score": 1.0,
+        "n": 4,
+        "right_n": 1,
+        "right_score": 0.0
+      },
+      "shopping-workflow-family-v1": {
+        "delta": null,
+        "left_n": 0,
+        "left_score": null,
+        "n": 4,
+        "right_n": 0,
+        "right_score": null
+      },
+      "source_reasoning-workflow-family-v1": {
+        "delta": null,
+        "left_n": 0,
+        "left_score": null,
+        "n": 4,
+        "right_n": 0,
+        "right_score": null
+      },
+      "support-workflow-family-v1": {
+        "delta": null,
+        "left_n": 0,
+        "left_score": null,
+        "n": 4,
+        "right_n": 0,
+        "right_score": null
+      },
+      "tabular_analysis-workflow-family-v1": {
+        "delta": 1.0,
+        "left_n": 1,
+        "left_score": 1.0,
+        "n": 4,
+        "right_n": 1,
+        "right_score": 0.0
+      },
+      "task_planning-workflow-family-v1": {
+        "delta": 1.0,
+        "left_n": 1,
+        "left_score": 1.0,
+        "n": 4,
+        "right_n": 1,
+        "right_score": 0.0
+      },
+      "travel-workflow-family-v1": {
+        "delta": 1.0,
+        "left_n": 1,
+        "left_score": 1.0,
+        "n": 4,
+        "right_n": 1,
+        "right_score": 0.0
+      }
+    },
+    "condition_mismatch_case_ids": [],
+    "duplicate_case_ids": [],
+    "family_counts": {
+      "ambiguity-workflow-family-v1": 4,
+      "automation-workflow-family-v1": 4,
+      "calendar-workflow-family-v1": 4,
+      "communication-workflow-family-v1": 4,
+      "conversation_memory-workflow-family-v1": 4,
+      "document_extraction-workflow-family-v1": 4,
+      "expenses-workflow-family-v1": 4,
+      "multilingual-workflow-family-v1": 4,
+      "privacy-workflow-family-v1": 4,
+      "shopping-workflow-family-v1": 4,
+      "source_reasoning-workflow-family-v1": 4,
+      "support-workflow-family-v1": 4,
+      "tabular_analysis-workflow-family-v1": 4,
+      "task_planning-workflow-family-v1": 4,
+      "travel-workflow-family-v1": 4
+    },
+    "independence_unit": "family_id",
+    "left_label": "synthetic-good",
+    "left_mean": 1.0,
+    "limitations": [
+      "Scores are paired by case and repeated family variants are not independent.",
+      "No statistical significance is inferred by this descriptive comparison."
+    ],
+    "matched_cases": 60,
+    "observed_difference": 1.0,
+    "right_label": "synthetic-incorrect",
+    "right_mean": 0.0,
+    "scored_pairs": 10,
+    "uncertainty": {
+      "estimate": 1.0,
+      "independent_families": 8,
+      "interval": [
+        1.0,
+        1.0
+      ],
+      "method": "cluster_bootstrap_percentile",
+      "resamples": 1000,
+      "resampling_unit": "family_id",
+      "seed": 17
+    }
+  },
+  "provenance": {
+    "model_quality_claim": false,
+    "provider": "fake",
+    "source": "offline_fake_provider"
+  },
+  "routing_recommendations": [
+    {
+      "candidate_model": "synthetic-good",
+      "coverage": {
+        "cases": 60,
+        "families": 15
+      },
+      "draft_only": true,
+      "eligibility": false,
+      "evidence_ids": [
+        "evidence-2cd7fe86c1a458a539487b74"
+      ],
+      "expected_cost": null,
+      "expected_latency_ms": null,
+      "fallback_candidates": [
+        "synthetic-incorrect"
+      ],
+      "limitations": [
+        "Scores are paired by case and repeated family variants are not independent.",
+        "No statistical significance is inferred by this descriptive comparison.",
+        "Synthetic/fake-provider evidence is not real-world model performance.",
+        "Paired score coverage is incomplete; unknown grades cannot support promotion.",
+        "Requested case coverage is incomplete; unmatched or unknown cases block promotion.",
+        "Critical-failure assessment is unavailable; recommendation is ineligible.",
+        "Task-condition eligibility evidence is unavailable; recommendation is ineligible.",
+        "Minimum quality threshold is missing or invalid; recommendation is ineligible."
+      ],
+      "observed_quality": 1.0,
+      "quality_metric": "mean grade score",
+      "recommendation_id": "recommendation-bbf0201eac78a4e140cca1ce",
+      "synthetic": true,
+      "task_condition": {
+        "complexity_levels": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ],
+        "domains": [
+          "ambiguity",
+          "automation",
+          "calendar",
+          "communication",
+          "conversation_memory",
+          "document_extraction",
+          "expenses",
+          "multilingual",
+          "privacy",
+          "shopping",
+          "source_reasoning",
+          "support",
+          "tabular_analysis",
+          "task_planning",
+          "travel"
+        ],
+        "splits": [
+          "calibration",
+          "holdout",
+          "train"
+        ]
+      }
+    },
+    {
+      "candidate_model": "synthetic-incorrect",
+      "coverage": {
+        "cases": 60,
+        "families": 15
+      },
+      "draft_only": true,
+      "eligibility": false,
+      "evidence_ids": [
+        "evidence-69b59627a89640db00725068"
+      ],
+      "expected_cost": null,
+      "expected_latency_ms": null,
+      "fallback_candidates": [
+        "synthetic-good"
+      ],
+      "limitations": [
+        "Scores are paired by case and repeated family variants are not independent.",
+        "No statistical significance is inferred by this descriptive comparison.",
+        "Synthetic/fake-provider evidence is not real-world model performance.",
+        "Paired score coverage is incomplete; unknown grades cannot support promotion.",
+        "Requested case coverage is incomplete; unmatched or unknown cases block promotion.",
+        "Critical-failure assessment is unavailable; recommendation is ineligible.",
+        "Task-condition eligibility evidence is unavailable; recommendation is ineligible.",
+        "Minimum quality threshold is missing or invalid; recommendation is ineligible."
+      ],
+      "observed_quality": 0.0,
+      "quality_metric": "mean grade score",
+      "recommendation_id": "recommendation-23259bcb8bd8172cef21ba90",
+      "synthetic": true,
+      "task_condition": {
+        "complexity_levels": [
+          "1",
+          "2",
+          "3",
+          "4"
+        ],
+        "domains": [
+          "ambiguity",
+          "automation",
+          "calendar",
+          "communication",
+          "conversation_memory",
+          "document_extraction",
+          "expenses",
+          "multilingual",
+          "privacy",
+          "shopping",
+          "source_reasoning",
+          "support",
+          "tabular_analysis",
+          "task_planning",
+          "travel"
+        ],
+        "splits": [
+          "calibration",
+          "holdout",
+          "train"
+        ]
+      }
+    }
+  ],
+  "runs": {
+    "synthetic-good": {
+      "attempts": 60,
+      "digest": "30bdc22396d92e65b151442562f6cf2f0a7a6d46ab9b50cb440a75c55ff9ca79",
+      "grades": 60,
+      "status": "completed"
+    },
+    "synthetic-incorrect": {
+      "attempts": 60,
+      "digest": "dbe11e9d738fb153dff8f766fee375bb6c658a612b1415fe812c72d03afe645e",
+      "grades": 60,
+      "status": "completed"
+    }
+  },
+  "seed": 7,
+  "suite_hash": "9f82842371ab949a1018c5625875b1830d625d95c7b7380d5e35a172f8df230e",
+  "suite_version": "0.1.0",
+  "synthetic": true
+}

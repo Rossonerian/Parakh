@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -33,6 +34,18 @@ COMMANDS = (
     "mobile-smoke", "mobile-e2e", "security", "performance", "resilience",
     "benchmark", "full", "production-check", "release-check",
 )
+BASELINE = "benchmarks/readiness-baseline.json"
+# Deterministic parts of the 60-case demo summary (report file paths/promptfoo exports vary per run).
+SNAPSHOT_KEYS = ("suite_hash", "suite_version", "cases", "synthetic", "provenance",
+                 "comparison", "routing_recommendations")
+
+
+def regression_snapshot(summary: dict[str, object], seed: int) -> dict[str, object]:
+    runs = summary["runs"]
+    assert isinstance(runs, dict)
+    return {"seed": seed, **{key: summary.get(key) for key in SNAPSHOT_KEYS},
+            "runs": {name: {field: run[field] for field in ("attempts", "digest", "grades", "status")}
+                     for name, run in sorted(runs.items())}}
 
 
 def release_state(gates: dict[str, str], manifest: dict[str, object]) -> str:
@@ -82,26 +95,44 @@ def python(path: Path) -> str | None:
     return str(candidate) if candidate.is_file() else None
 
 
+def installed_digest(repo: Path) -> str | None:
+    """SHA-256 of the sorted name==version set installed in a repo's isolated runtime."""
+    executable = python(repo)
+    if executable is None:
+        return None
+    listed = subprocess.run([executable, "-c", "import importlib.metadata as m; print('\\n'.join(sorted("
+                             "f\"{d.metadata['Name']}=={d.version}\" for d in m.distributions())))"],
+                            capture_output=True, text=True, timeout=60, check=False)
+    return hashlib.sha256(listed.stdout.encode()).hexdigest() if listed.returncode == 0 else None
+
+
 class Runner:
     def __init__(self, command: str, karmi: Path, output: Path,
-                 mobile_evidence: Path | None = None, production_env: Path | None = None):
+                 mobile_evidence: Path | None = None, production_env: Path | None = None,
+                 accept_baseline: bool = False):
         self.command = command
         self.karmi = karmi
         self.output = output
         self.mobile_evidence = mobile_evidence
         self.production_env = production_env
+        self.accept_baseline = accept_baseline
         self.output.mkdir(parents=True, exist_ok=False, mode=0o700)
         self.output.chmod(0o700)
         (self.output / "logs").mkdir(mode=0o700)
         self.cases: list[dict[str, object]] = []
         self.manifest: dict[str, object] = {
-            "schema_version": 1, "runner_version": "readiness.v1", "command": command,
+            "schema_version": 2, "runner_version": "readiness.v2", "command": command,
             "started_at": utc(), "environment": "local-synthetic-only", "parakh": git_info(ROOT),
             "karmi": git_info(karmi), "benchmark_seed": 7,
             "dataset_sha256": digest(ROOT / "benchmarks/seed_cases.jsonl"),
             "karmi_dataset_sha256": digest(karmi / "benchmarks/seed_cases.jsonl"),
             "karmi_lock_sha256": digest(karmi / "requirements.lock"),
-            "python": sys.version.split()[0], "device": None,
+            # Parakh has no lock file: record the exact installed set of each isolated runtime.
+            "parakh_installed_sha256": installed_digest(ROOT),
+            "karmi_installed_sha256": installed_digest(karmi),
+            "baseline_sha256": digest(ROOT / BASELINE),
+            "runner_sha256": digest(Path(__file__)),
+            "python": sys.version.split()[0], "platform": platform.platform(), "device": None,
         }
 
     def record(self, gate: str, name: str, status: str, reason: str,
@@ -239,19 +270,31 @@ class Runner:
             self.run("PARAKH", "offline-60-case-demo",
                      ["make", f"PYTHON={executable}", f"DEMO_OUT={demo}", "demo"], ROOT, timeout=1200)
         summary = demo / "summary.json"
-        baseline = ROOT / "benchmarks/readiness-baseline.json"
-        if summary.is_file() and baseline.is_file():
-            actual = json.loads(summary.read_text(encoding="utf-8"))
-            expected = json.loads(baseline.read_text(encoding="utf-8"))
-            observed = {"suite_hash": actual["suite_hash"],
-                        "seed": self.manifest["benchmark_seed"],
-                        "digests": {key: value["digest"] for key, value in actual["runs"].items()}}
-            self.record("PARAKH", "synthetic-regression", "PASS" if observed == expected else "FAIL",
-                        "60-case suite and deterministic response digests match reviewed snapshot"
-                        if observed == expected else "benchmark dataset/seed or result digest changed")
-        else:
+        baseline = ROOT / BASELINE
+        if not summary.is_file():
+            self.record("PARAKH", "synthetic-regression", "BLOCKED", "60-case demo produced no summary")
+            self.karmi_task("KARMI", "benchmark-demo")
+            return
+        observed = regression_snapshot(json.loads(summary.read_text(encoding="utf-8")),
+                                       self.manifest["benchmark_seed"])
+        (self.output / "regression-snapshot.json").write_text(json.dumps(observed, indent=2, sort_keys=True) + "\n")
+        if self.accept_baseline:
+            baseline.write_text(json.dumps(observed, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+            self.record("PARAKH", "synthetic-regression", "NOT_RUN",
+                        f"baseline rewritten at {BASELINE}; review the diff and commit it, then rerun")
+        elif not baseline.is_file():
             self.record("PARAKH", "synthetic-regression", "BLOCKED",
-                        "Synthetic summary or reviewed baseline unavailable")
+                        f"no reviewed baseline at {BASELINE}; create with --accept-baseline")
+        else:
+            expected = json.loads(baseline.read_text(encoding="utf-8"))
+            changed = sorted(key for key in set(expected) | set(observed) if expected.get(key) != observed.get(key))
+            if changed:
+                (self.output / "regression-diff.json").write_text(json.dumps(
+                    {key: {"baseline": expected.get(key), "observed": observed.get(key)} for key in changed},
+                    indent=2, sort_keys=True) + "\n")
+            self.record("PARAKH", "synthetic-regression", "FAIL" if changed else "PASS",
+                        f"differs from reviewed baseline in: {', '.join(changed)} (see regression-diff.json)"
+                        if changed else "suite, seed, run digests, comparison and routing recommendations match baseline")
         self.karmi_task("KARMI", "benchmark-demo")
 
     def external(self, gate: str, name: str, relative: str, *args: str,
@@ -422,11 +465,16 @@ def main() -> int:
                         help="reviewer observations matching Karmi SHA, installed APK hash and device serial")
     parser.add_argument("--production-env", type=Path,
                         help="explicit private deployment-candidate env file (values never stored in evidence)")
+    parser.add_argument("--accept-baseline", action="store_true",
+                        help=f"benchmark only: rewrite {BASELINE} from this run (review and commit it)")
     args = parser.parse_args()
+    if args.accept_baseline and args.command != "benchmark":
+        parser.error("--accept-baseline is only valid with the benchmark command")
     output = args.output or ROOT / "test-results" / (datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8])
     runner = Runner(args.command, args.karmi.resolve(), output.resolve(),
                     args.mobile_evidence.resolve() if args.mobile_evidence else None,
-                    args.production_env.resolve() if args.production_env else None)
+                    args.production_env.resolve() if args.production_env else None,
+                    accept_baseline=args.accept_baseline)
     if args.command == "doctor": runner.doctor()
     elif args.command == "lint": runner.lint()
     elif args.command == "typecheck": runner.typecheck()
