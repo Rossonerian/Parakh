@@ -59,6 +59,19 @@ def test_mixed_result_cannot_pass_gate(tmp_path: Path) -> None:
     assert report["gates"]["STATIC"] == "FAIL"
 
 
+def test_release_state_is_never_production_and_follows_gate_precedence() -> None:
+    clean = {"parakh": {"status": "available", "dirty": False}, "karmi": {"status": "available", "dirty": False}}
+    all_pass = dict.fromkeys(readiness.GATES, "PASS")
+    assert readiness.release_state(all_pass, clean) == "RELEASE_READY"
+    # A dirty checkout makes every result unattributable, even when all gates pass.
+    assert readiness.release_state(all_pass, {**clean, "karmi": {"status": "available", "dirty": True}}) == "DEVELOPMENT"
+    external_gap = {**all_pass, "DEPLOYMENT": "BLOCKED"}
+    assert readiness.release_state(external_gap, clean) == "CANDIDATE"
+    # One blocked engineering gate outranks external gaps: blocked never becomes a candidate.
+    assert readiness.release_state({**external_gap, "MOBILE": "BLOCKED"}, clean) == "TESTING"
+    assert readiness.release_state({**all_pass, "ROLLBACK": "NOT_RUN"}, clean) == "TESTING"
+
+
 def test_credential_lines_are_not_kept() -> None:
     log = readiness.safe_log("normal failure\nAuthorization: Bearer do-not-store\npassword=do-not-store\n")
     assert "normal failure" in log

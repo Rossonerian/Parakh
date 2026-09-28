@@ -8,16 +8,26 @@ The first useful output is often `PRODUCTION READY: NO`: it distinguishes produc
 
 A stage can be PASS only if all its named subchecks passed. `STATIC`, `UNIT`, `COMPONENT`, `INTEGRATION`, `E2E`, `MOBILE`, `SECURITY`, `PERFORMANCE`, `RESILIENCE`, `PARAKH`, `KARMI`, `CROSS_SYSTEM`, `PRODUCTION_CONFIG`, `ROLLBACK`, `REAL_IDENTITY`, `PAID_PROVIDER`, `BILLING`, `CHANNEL_ELIGIBILITY`, `DEPLOYMENT` are mandatory. An absent run is NOT_RUN; absent Flutter/Docker or manual evidence is BLOCKED; a command or negative behavior assertion that fails is FAIL. Any non-PASS gate forces `production_ready: false` and `PRODUCTION READY: NO`.
 
-Release states are DEVELOPMENT, TESTING, CANDIDATE, RELEASE_READY and PRODUCTION. The machine may recommend RELEASE_READY only for a completely passing exact candidate; it never sets PRODUCTION. Operator-owned production deployment, observed health/TLS/telemetry, approved budgets, authentication, rollback, payment/provider/channel eligibility and real device evidence are separate reviews. Never approve an external gate by assertion or by replacing it with a fake provider test. This testing harness currently records those gates BLOCKED until authorized, inspected real evidence exists.
+Release states are derived mechanically by `release_state()` in `scripts/readiness.py` and written to `production-readiness.json` (`state`):
+
+| State | Condition |
+| --- | --- |
+| DEVELOPMENT | Either checkout missing or dirty: results cannot be attributed to a commit. |
+| TESTING | Both checkouts clean, but any engineering gate (`STATIC` … `ROLLBACK`) is FAIL/BLOCKED/NOT_RUN. |
+| CANDIDATE | Every engineering gate PASS; an owner/external gate (`REAL_IDENTITY`, `PAID_PROVIDER`, `BILLING`, `CHANNEL_ELIGIBILITY`, `DEPLOYMENT`) is not PASS. |
+| RELEASE_READY | Every gate PASS for the exact recorded commits. |
+| PRODUCTION | Never set by any command; requires an authorized human deployment record. |
+
+The report also lists every non-passing check with its reason. Operator-owned production deployment, observed health/TLS/telemetry, approved budgets, authentication, rollback, payment/provider/channel eligibility and real device evidence are separate reviews. Never approve an external gate by assertion or by replacing it with a fake provider test. This harness records those gates BLOCKED until authorized, inspected real evidence exists.
 
 ## Gate coverage and limitations
 
 - Parakh: its existing Makefile lint, doctor, unit/integration/E2E, frozen 60-case validation and isolated offline demo; regression snapshot compares the seed suite SHA and synthetic output digests. Fixture-only router quality says nothing about real Karmi actions or supported off-policy evaluation: Karmi's logged live propensity is 1.0 with no alternative-action support.
-- Karmi: existing `scripts/tasks.py` lint/secret scan, mypy, unit/E2E, fake ModelLab; disposable Docker Compose PostgreSQL/Redis tests are required, not replaced by SQLite. Flutter format/analyze/widget/golden/build are required; installed packages need candidate SHA and byte-for-byte APK proof. The current production auth/provider/payment/WhatsApp rollout does not pass simply because dev token and fake answer flows work.
+- Karmi: existing `scripts/tasks.py` lint/secret scan, mypy, unit/E2E, fake ModelLab; disposable PostgreSQL/Redis tests (Docker Compose or rootless Podman, same images/ports) are required, not replaced by SQLite. Flutter format/analyze/widget/golden/build are required; installed packages need candidate SHA and byte-for-byte APK proof. The current production auth/provider/payment/WhatsApp rollout does not pass simply because dev token and fake answer flows work.
 - Cross-system: Karmi-exported synthetic telemetry must be accepted by Parakh with idempotency/privacy checks, a signed candidate must be verified, Karmi SHADOW evaluated without changing the live route, and bad signatures/unknown versions/duplicates rejected. Parakh's `sim/*` fixture is incompatible with Karmi's real action registry; a separately test-signed Karmi-action bundle only proves receiver/shadow mechanics, not Parakh's real-action quality gate.
 - Security scan covers native tests, narrow tracked-file secret signatures and configuration checks; vulnerability database, TLS, production infrastructure and manual pentest require real evidence. Results never include matched secret values.
 - Performance local sample uses only a disposable SQLite-backed loopback server with no live models. `performance.json` reports startup, /ready latency p50/p95/p99, throughput/error rate, DB `SELECT 1` latency, CPU ticks and RSS. This is **not** a customer workload or approved production SLO; missing approved thresholds BLOCK the production performance gate. Device profile/TalkBack/low-end hardware remain separate requirements.
-- Resilience local smoke stops/restarts a disposable backend and checks unavailable/recovered readiness. Docker-required PostgreSQL/Redis outages, device Wi-Fi loss, provider timeout-after-action reconciliation and restore are separate required cases; missing evidence stays BLOCKED.
+- Resilience: `failure-injection` stops/restarts a disposable backend; `postgres-redis-outage` stops the disposable PostgreSQL under a running Karmi and requires 5xx `/ready` without internal detail, refused writes, a surviving process, recovery, successful retry and exact idempotent replay, then stops Redis (Karmi's runtime does not use Redis; only its integration test does). Device Wi-Fi loss, provider timeout-after-action reconciliation and restore remain separate required cases; missing evidence stays BLOCKED.
 
 ## CI and human verification
 

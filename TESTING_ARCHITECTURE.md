@@ -8,7 +8,7 @@ Parakh is the orchestration/evidence home; Karmi keeps its native `scripts/tasks
 | --- | --- | --- |
 | L0 static | `lint`, `typecheck`, `security` | Native ruff/mypy/Flutter analyze/format where available, config/schema/lock and dependency checks. Missing tool or scan is BLOCKED. |
 | L1 unit | `unit` | Both native pytest suites and Flutter widget tests; synthetic/isolated, exact exits. |
-| L2 component | `component` | Karmi API/auth/DB tests, routing/telemetry, Parakh schema/optimizer tests; Postgres/Redis tests are separate and Docker-required. |
+| L2 component | `component` | Karmi API/auth/DB tests, routing/telemetry, Parakh schema/optimizer tests; Postgres/Redis tests run under `integration` on disposable Docker or rootless Podman containers. |
 | L3 integration | `integration` | Existing disposable DB/Redis test and real cross-repo schema/fixture/shadow contract; fixture-only versus actual service evidence labeled separately. |
 | L4 E2E | `e2e` | Karmi FastAPI and owned PWA existing E2E; Parakh offline full-pipeline demo. Running tests does not establish a browser journey or production authentication. |
 | L5 device | `mobile-smoke`, `mobile-e2e` | Candidate-matched debug/profile APK on physical device, adb-reverse or constrained private LAN, human-observed flows; each step carries a status and artifact. Device absence/provenance mismatch BLOCKED. |

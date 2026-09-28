@@ -17,18 +17,38 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-GATES = (
+ENGINEERING_GATES = (
     "STATIC", "UNIT", "COMPONENT", "INTEGRATION", "E2E", "MOBILE", "SECURITY",
     "PERFORMANCE", "RESILIENCE", "PARAKH", "KARMI", "CROSS_SYSTEM",
-    "PRODUCTION_CONFIG", "ROLLBACK", "REAL_IDENTITY", "PAID_PROVIDER",
-    "BILLING", "CHANNEL_ELIGIBILITY", "DEPLOYMENT",
+    "PRODUCTION_CONFIG", "ROLLBACK",
 )
+# Owner/external acceptance: cannot be produced by local automation.
+EXTERNAL_GATES = ("REAL_IDENTITY", "PAID_PROVIDER", "BILLING", "CHANNEL_ELIGIBILITY", "DEPLOYMENT")
+GATES = ENGINEERING_GATES + EXTERNAL_GATES
+# PRODUCTION is listed for completeness but is never returned by release_state().
+RELEASE_STATES = ("DEVELOPMENT", "TESTING", "CANDIDATE", "RELEASE_READY", "PRODUCTION")
 SENSITIVE = re.compile(r"(?i)(authorization|bearer|api[_-]?key|access[_-]?token|password|private[_-]?key|auth[_-]?secret|webhook[_-]?secret|cookie|set-cookie)")
 COMMANDS = (
     "doctor", "lint", "typecheck", "unit", "component", "integration", "e2e",
     "mobile-smoke", "mobile-e2e", "security", "performance", "resilience",
     "benchmark", "full", "production-check", "release-check",
 )
+
+
+def release_state(gates: dict[str, str], manifest: dict[str, object]) -> str:
+    """DEVELOPMENT: a checkout is missing or dirty (results not attributable to a commit).
+    TESTING: attributable, but an engineering gate is not PASS.
+    CANDIDATE: every engineering gate PASS; owner/external acceptance incomplete.
+    RELEASE_READY: every gate PASS. PRODUCTION requires a human deployment record."""
+    for repo in ("parakh", "karmi"):
+        meta = manifest.get(repo)
+        if not isinstance(meta, dict) or meta.get("status") != "available" or meta.get("dirty") is not False:
+            return "DEVELOPMENT"
+    if any(gates.get(gate) != "PASS" for gate in ENGINEERING_GATES):
+        return "TESTING"
+    if any(gates.get(gate) != "PASS" for gate in EXTERNAL_GATES):
+        return "CANDIDATE"
+    return "RELEASE_READY"
 
 
 def utc() -> str:
@@ -152,7 +172,10 @@ class Runner:
                         f"revision {meta['sha']}; branch {meta['branch']}; dirty={meta['dirty']}")
             self.record("STATIC", f"{repo.name}-python", "PASS" if python(repo) else "BLOCKED",
                         "isolated .venv/bin/python present" if python(repo) else "isolated Python absent")
-        for tool in ("docker", "flutter", "adb"):
+        engine = shutil.which("docker") or shutil.which("podman")
+        self.record("STATIC", "tool-container-engine", "PASS" if engine else "BLOCKED",
+                    f"{Path(engine).name} (disposable PostgreSQL/Redis)" if engine else "neither docker nor podman installed")
+        for tool in ("flutter", "adb"):
             self.record("STATIC", f"tool-{tool}", "PASS" if shutil.which(tool) else "BLOCKED",
                         "available" if shutil.which(tool) else "not installed")
         self.karmi_task("KARMI", "doctor")
@@ -187,8 +210,8 @@ class Runner:
         if shutil.which("docker"):
             self.karmi_task("INTEGRATION", "test-integration")
         else:
-            self.record("INTEGRATION", "karmi-test-integration", "BLOCKED",
-                        "Docker unavailable for disposable PostgreSQL/Redis")
+            # Same images/ports/credentials as Karmi's compose.yaml, via rootless Podman.
+            self.dependency("INTEGRATION", "karmi-test-integration", "integration")
         karmi_python = python(self.karmi)
         if (self.karmi / "src/daily_agent/parakh/telemetry.py").is_file() and karmi_python:
             # Karmi's runtime owns FastAPI/SQLAlchemy; Parakh modules come from this checkout.
@@ -231,12 +254,20 @@ class Runner:
                         "Synthetic summary or reviewed baseline unavailable")
         self.karmi_task("KARMI", "benchmark-demo")
 
-    def external(self, gate: str, name: str, relative: str, *args: str) -> None:
+    def external(self, gate: str, name: str, relative: str, *args: str,
+                 blocked_evidence: Path | None = None) -> None:
         script = ROOT / "scripts" / relative
         if not script.is_file():
             self.record(gate, name, "BLOCKED", f"implementation missing: scripts/{relative}")
         else:
-            self.run(gate, name, [sys.executable, str(script), *args], ROOT)
+            self.run(gate, name, [sys.executable, str(script), *args], ROOT,
+                     blocked_evidence=blocked_evidence)
+
+    def dependency(self, gate: str, name: str, mode: str) -> None:
+        """Disposable PostgreSQL/Redis probe: exit 2 with evidence = BLOCKED (environment)."""
+        self.external(gate, name, "dependency_probe.py", mode, "--karmi", str(self.karmi),
+                      "--output", str(self.output),
+                      blocked_evidence=self.output / f"dependency-{mode}.json")
 
     def mobile(self, *, extended: bool) -> None:
         script = self.karmi / "mobile/tool/readiness_device.py"
@@ -281,9 +312,7 @@ class Runner:
         self.external("RESILIENCE", "failure-injection", "resilience_probe.py", "--karmi", str(self.karmi), "--output", str(self.output))
         self.native("RESILIENCE", "negative-policy-and-budgets", self.karmi,
                     ["-m", "pytest", "-q", "tests/e2e/test_parakh_exchange.py", "tests/unit/test_config.py"])
-        if not shutil.which("docker"):
-            self.record("RESILIENCE", "postgres-redis-outage", "BLOCKED",
-                        "Disposable Docker PostgreSQL/Redis unavailable; no shared service will be interrupted")
+        self.dependency("RESILIENCE", "postgres-redis-outage", "outage")
         self.record("RESILIENCE", "device-network-loss", "BLOCKED",
                     "Requires candidate-bound physical Android observations")
 
@@ -338,16 +367,32 @@ class Runner:
             elif observed and all(status == "PASS" for status in observed):
                 gates[gate] = "PASS"
         ready = all(status == "PASS" for status in gates.values())
-        report = {"schema_version": 1, "candidate": {"parakh": self.manifest["parakh"],
+        state = release_state(gates, self.manifest)
+        report = {"schema_version": 2, "candidate": {"parakh": self.manifest["parakh"],
                   "karmi": self.manifest["karmi"]}, "gates": gates,
-                  "production_ready": ready, "state": "RELEASE_READY" if ready else "TESTING",
-                  "production_state": "NOT_DEPLOYED", "run": self.output.name}
+                  "production_ready": ready, "state": state,
+                  "states": list(RELEASE_STATES),
+                  "production_state": "NOT_DEPLOYED", "run": self.output.name,
+                  "not_passing": [{key: row[key] for key in ("gate", "name", "status", "reason")}
+                                  for row in self.cases if row["status"] != "PASS"]}
         (self.output / "results.json").write_text(json.dumps(self.manifest, indent=2) + "\n", encoding="utf-8")
         (self.output / "production-readiness.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-        lines = ["# Production readiness", "", f"Run: `{self.output.name}`", "",
-                 f"PRODUCTION READY: {'YES' if ready else 'NO'}", "", "| Gate | Status |", "| --- | --- |"]
+        lines = ["# Production readiness", "", f"Run: `{self.output.name}` (`{self.command}`)", "",
+                 f"PRODUCTION READY: {'YES' if ready else 'NO'}", "", f"Release state: **{state}** "
+                 "(DEVELOPMENT → TESTING → CANDIDATE → RELEASE_READY; PRODUCTION is set only by an "
+                 "authorized human deployment record, never by this runner)", "",
+                 f"Parakh `{self.manifest['parakh'].get('sha')}` ({self.manifest['parakh'].get('branch')}, "
+                 f"dirty={self.manifest['parakh'].get('dirty')}); Karmi `{self.manifest['karmi'].get('sha')}` "
+                 f"({self.manifest['karmi'].get('branch')}, dirty={self.manifest['karmi'].get('dirty')})", "",
+                 "| Gate | Status |", "| --- | --- |"]
         lines += [f"| {gate} | {status} |" for gate, status in gates.items()]
-        lines += ["", "Evidence: `results.json`, `results.xml`, and sanitized `logs/` in this run.",
+        if report["not_passing"]:
+            lines += ["", "## Not passing", "", "| Gate | Check | Status | Reason |", "| --- | --- | --- | --- |"]
+            lines += [f"| {row['gate']} | {row['name']} | {row['status']} | {str(row['reason']).replace('|', '/')} |"
+                      for row in report["not_passing"]]
+        lines += ["", "Evidence: `results.json` (versions, lock/dataset hashes, seed, per-check timing), "
+                  "`results.xml`, and sanitized `logs/` in this run. Reproduce with "
+                  f"`./test {self.command}` at the recorded commits.",
                   "No automation marks a candidate deployed or PRODUCTION.", ""]
         (self.output / "PRODUCTION_READINESS_REPORT.md").write_text("\n".join(lines), encoding="utf-8")
         suite = ET.Element("testsuite", name="readiness", tests=str(len(self.cases)),
@@ -364,7 +409,7 @@ class Runner:
         if self.command in {"production-check", "release-check"}:
             (ROOT / "production-readiness.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
             (ROOT / "PRODUCTION_READINESS_REPORT.md").write_text("\n".join(lines), encoding="utf-8")
-        print(f"Evidence: {self.output}; PRODUCTION READY: {'YES' if ready else 'NO'}", flush=True)
+        print(f"Evidence: {self.output}; state: {state}; PRODUCTION READY: {'YES' if ready else 'NO'}", flush=True)
         return bool(self.cases) and all(row["status"] == "PASS" for row in self.cases)
 
 

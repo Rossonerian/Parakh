@@ -16,26 +16,33 @@ import urllib.request
 from pathlib import Path
 
 
-def serve(karmi: Path, db: Path, port: int) -> subprocess.Popen[bytes]:
+def serve(karmi: Path, db: Path, port: int, *, database_url: str | None = None,
+          redis_url: str | None = None) -> subprocess.Popen[bytes]:
     python = karmi / ".venv/bin/python"
     if not python.is_file() or not (karmi / "src/daily_agent/api.py").is_file():
         raise RuntimeError("Karmi runtime or source unavailable")
     env = {key: os.environ[key] for key in ("PATH", "HOME", "LANG", "TMPDIR") if key in os.environ}
     env.update(PYTHONPATH=str(karmi / "src"), DAILY_AGENT_ENVIRONMENT="test",
-               DAILY_AGENT_DATABASE_URL=f"sqlite+pysqlite:///{db}",
+               DAILY_AGENT_DATABASE_URL=database_url or f"sqlite+pysqlite:///{db}",
                DAILY_AGENT_LIVE_MODELS_ENABLED="false", DAILY_AGENT_PAID_CHECKOUT_ENABLED="false",
                DAILY_AGENT_WHATSAPP_ENABLED="false", DAILY_AGENT_ALLOW_DEVELOPMENT_AUTH="true")
+    if redis_url:
+        env["DAILY_AGENT_REDIS_URL"] = redis_url
     return subprocess.Popen([str(python), "-m", "uvicorn", "daily_agent.api:app",
                              "--host", "127.0.0.1", "--port", str(port), "--no-access-log"],
                             cwd=karmi, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 
 
-def fetch(url: str) -> tuple[int, float]:
+def fetch(url: str, timeout: float = 2) -> tuple[int, float]:
+    """HTTP status (0 = no response: refused/timeout) and elapsed seconds."""
     start = time.perf_counter()
     try:
-        with urllib.request.urlopen(url, timeout=2) as response:
+        with urllib.request.urlopen(url, timeout=timeout) as response:
             return response.status, time.perf_counter() - start
-    except (urllib.error.URLError, TimeoutError):
+    except urllib.error.HTTPError as error:  # a real 4xx/5xx response, not an outage
+        error.close()
+        return error.code, time.perf_counter() - start
+    except (urllib.error.URLError, TimeoutError, ConnectionError):
         return 0, time.perf_counter() - start
 
 
