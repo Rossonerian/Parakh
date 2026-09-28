@@ -13,3 +13,6 @@ promptfoo/
 .coverage
 htmlcov/
 .agent-team/
+test-results/
+production-readiness.json
+PRODUCTION_READINESS_REPORT.md
