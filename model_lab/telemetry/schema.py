@@ -265,7 +265,8 @@ def parse_run(raw: Any, index: int, batch_feature_schema: str) -> RunRecord | In
         if _is(context.get(name), int) and context[name] < 0:
             errors.append(f"routing_context.negative_{name}")
     ratio = context.get("context_utilization_ratio")
-    if isinstance(ratio, (int, float)) and not 0 <= ratio <= 1:
+    # _is() excludes bools and non-finite floats; isinstance() only narrows the type for pyright.
+    if _is(ratio, (int, float)) and isinstance(ratio, (int, float)) and not 0 <= ratio <= 1:
         errors.append("routing_context.ratio_out_of_range")
     if context and (context.get("tier") != raw.get("tier") or context.get("task_domain") != raw.get("task_domain")):
         errors.append("routing_context.run_mismatch")

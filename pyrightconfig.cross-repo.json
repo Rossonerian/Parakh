@@ -1,0 +1,7 @@
+// Typechecks the Karmi-runtime contract test; `./test typecheck` passes --venvpath <Karmi checkout>.
+{
+  "pythonVersion": "3.12",
+  "include": ["tests/test_cross_repo_readiness.py"],
+  "extraPaths": ["."],
+  "venv": ".venv"
+}

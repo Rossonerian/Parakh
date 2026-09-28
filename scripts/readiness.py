@@ -194,7 +194,9 @@ class Runner:
         self.native(gate, f"karmi-{task}", self.karmi, ["scripts/tasks.py", task], timeout=timeout)
 
     def flutter(self, gate: str, name: str, args: list[str]) -> None:
-        self.run(gate, name, args, self.karmi / "mobile", timeout=1200)
+        # Goldens render reset times via toLocal(); baselines were generated in UTC (Karmi CI/container).
+        # Dart cannot override the zone in-process, so pin it here; host TZ would otherwise flip 8 goldens.
+        self.run(gate, name, args, self.karmi / "mobile", timeout=1200, extra_env={"TZ": "UTC"})
 
     def doctor(self) -> None:
         for repo in (ROOT, self.karmi):
@@ -220,7 +222,16 @@ class Runner:
 
     def typecheck(self) -> None:
         self.karmi_task("STATIC", "typecheck")
-        self.record("STATIC", "parakh-typecheck", "BLOCKED", "No project-wide Parakh type-check target; pyright settings alone do not prove clean types")
+        # Parakh's own runtime; the cross-repo contract imports Karmi and is checked in Karmi's runtime.
+        if shutil.which("pyright") is None:
+            self.record("STATIC", "parakh-typecheck", "BLOCKED", "pyright not installed (project [tool.pyright] config)")
+            return
+        self.run("STATIC", "parakh-typecheck", ["pyright", "--pythonpath", str(ROOT / ".venv/bin/python")], ROOT)
+        if python(self.karmi):
+            self.run("STATIC", "cross-repo-typecheck",
+                     ["pyright", "-p", "pyrightconfig.cross-repo.json", "--venvpath", str(self.karmi)], ROOT)
+        else:
+            self.record("STATIC", "cross-repo-typecheck", "BLOCKED", "Karmi .venv missing")
 
     def unit(self) -> None:
         self.parakh_make("UNIT", "test-unit")

@@ -43,6 +43,8 @@ select = ["F", "B"]
 [tool.pyright]
 pythonVersion = "3.11"
 include = ["model_lab", "tests"]
+# Needs Karmi's runtime; typechecked separately by `./test typecheck` with Karmi's venv.
+exclude = ["tests/test_cross_repo_readiness.py", "**/__pycache__", "**/.*"]
 venvPath = "."
 venv = ".venv"
 

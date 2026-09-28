@@ -60,8 +60,9 @@ def test_mixed_result_cannot_pass_gate(tmp_path: Path) -> None:
 
 
 def test_release_state_is_never_production_and_follows_gate_precedence() -> None:
-    clean = {"parakh": {"status": "available", "dirty": False}, "karmi": {"status": "available", "dirty": False}}
-    all_pass = dict.fromkeys(readiness.GATES, "PASS")
+    clean: dict[str, object] = {"parakh": {"status": "available", "dirty": False},
+                                "karmi": {"status": "available", "dirty": False}}
+    all_pass: dict[str, str] = dict.fromkeys(readiness.GATES, "PASS")
     assert readiness.release_state(all_pass, clean) == "RELEASE_READY"
     # A dirty checkout makes every result unattributable, even when all gates pass.
     assert readiness.release_state(all_pass, {**clean, "karmi": {"status": "available", "dirty": True}}) == "DEVELOPMENT"
