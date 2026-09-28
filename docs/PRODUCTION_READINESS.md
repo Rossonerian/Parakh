@@ -49,7 +49,22 @@ The report also lists every non-passing check with its reason. Operator-owned pr
 
 ## CI and human verification
 
-PR CI must run deterministic static/unit/component/contract/security checks. Main/master must run full synthetic checks with disposable dependencies and compare regression snapshots. A release workflow emits a candidate-bound artifact and report, and must never auto-promote a policy or production state.
+`.github/workflows/ci.yml` has three tiers. Every job checks out Karmi at the reviewed `KARMI_REF`.
+
+- **Pull request.** Three jobs:
+  - `test`: Parakh `make test-release` and the demo.
+  - `cross-repo`: the synthetic shadow contract.
+  - `static-security`: `./test typecheck` and `./test security`, with the evidence uploaded.
+- **Push to main** adds `main-suite`. It runs `./test lint`, `typecheck`, `unit`, `component`, `integration`, `e2e`, `benchmark`, `performance`, `resilience` and `rollback` on disposable Docker services with Flutter 3.47.5, and uploads every evidence directory. Every stage runs; the job fails if any stage failed.
+- **Tag `v*` or manual dispatch** adds `release`. It:
+  - runs the 60-case benchmark twice and diffs the regression snapshots (reproducibility);
+  - runs `./test release-check`;
+  - records both SHAs, the state and `production_ready` in the job summary;
+  - uploads the release evidence.
+
+  The phone gate and the external gates are BLOCKED in CI, so the release job stays red. That is by design, not a flake. No job deploys or promotes a policy.
+
+The pinned `KARMI_REF` predates the local `readiness-harness` branch. Until that branch is pushed and the pin is bumped after review, CI records `PRODUCTION_CONFIG` as BLOCKED because the scanner is absent. For the same reason, CI's `rollback` stage lacks the `d0e1f3a5b6c7` downgrade fix and will FAIL, which is correct for that Karmi commit.
 
 CI cannot hold the phone. `./test mobile-smoke` on the operator's machine is the pre-release device gate: it is automated on one attached phone, or runs from human-reviewed evidence via `--mobile-evidence`. Real TalkBack speech and subjective accessibility still need a human. See `docs/MOBILE_TESTING.md` and `QUICKSTART_TESTING.md`.
 

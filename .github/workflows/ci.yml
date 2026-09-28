@@ -1,10 +1,26 @@
 name: CI
 
+# Tiers (TESTING_ARCHITECTURE.md / docs/PRODUCTION_READINESS.md):
+#   pull request  -> test, cross-repo, static-security
+#   push to main  -> + main-suite (full synthetic suite, E2E, benchmark regression, integration, evidence artifact)
+#   tag v* / manual -> + release (release-check report, reproducibility check, versions); fails unless every gate passes
+# The physical phone gate never runs here (./test mobile-smoke on the operator machine).
+
 on:
   push:
     branches: [ "main" ]
+    tags: [ "v*" ]
   pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
+
+env:
+  # Reviewed Karmi exchange commit; bump deliberately after review.
+  KARMI_REF: 84e49ad3a215f1e4f5e3d681b76be54c59b3e580
+  PYRIGHT_VERSION: 1.1.414
+  DAILY_AGENT_LIVE_MODELS_ENABLED: "false"
+  DAILY_AGENT_PAID_CHECKOUT_ENABLED: "false"
+  DAILY_AGENT_WHATSAPP_ENABLED: "false"
 
 jobs:
   test:
@@ -29,10 +45,8 @@ jobs:
         run: make demo
 
   cross-repo:
-    # Synthetic offline contract against the reviewed Karmi exchange commit; bump deliberately.
+    # Synthetic offline contract against the reviewed Karmi exchange commit.
     runs-on: ubuntu-latest
-    env:
-      KARMI_REF: 84e49ad3a215f1e4f5e3d681b76be54c59b3e580
     steps:
       - uses: actions/checkout@v4
 
@@ -58,5 +72,158 @@ jobs:
           PARAKH_KARMI_DIR: karmi
           PYTHONPATH: ".:karmi/src"
           DAILY_AGENT_ENVIRONMENT: test
-          DAILY_AGENT_LIVE_MODELS_ENABLED: "false"
         run: python -m pytest -q -p no:cacheprovider tests/test_cross_repo_readiness.py
+
+  static-security:
+    # PR tier: type checking in both runtimes, tracked-secret and dependency-vulnerability gates.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: Kashyep/Karmi
+          ref: ${{ env.KARMI_REF }}
+          path: karmi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Isolated runtimes (same layout as a developer checkout)
+        run: |
+          python -m venv .venv && .venv/bin/pip install -q -e '.[dev]'
+          python -m venv karmi/.venv && karmi/.venv/bin/pip install -q -c karmi/requirements.lock -e './karmi[dev]'
+          npm install -g "pyright@${PYRIGHT_VERSION}"
+
+      - name: Typecheck (runner gate)
+        run: ./test typecheck --karmi "$GITHUB_WORKSPACE/karmi" --output "$RUNNER_TEMP/typecheck"
+
+      - name: Security (runner gate)
+        run: ./test security --karmi "$GITHUB_WORKSPACE/karmi" --output "$RUNNER_TEMP/security"
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pr-static-security-evidence
+          path: ${{ runner.temp }}/*/
+          if-no-files-found: warn
+
+  main-suite:
+    # Main tier: every CI-runnable stage through the evidence runner; mobile is operator-only.
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: Kashyep/Karmi
+          ref: ${{ env.KARMI_REF }}
+          path: karmi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.5"
+          channel: stable
+
+      - name: Isolated runtimes
+        run: |
+          python -m venv .venv && .venv/bin/pip install -q -e '.[dev]'
+          python -m venv karmi/.venv && karmi/.venv/bin/pip install -q -c karmi/requirements.lock -e './karmi[dev]'
+          npm install -g "pyright@${PYRIGHT_VERSION}"
+          (cd karmi/mobile && flutter pub get)
+
+      - name: Stages
+        # Each stage writes its own evidence directory; continue so every stage reports, then fail at the end.
+        run: |
+          status=0
+          for stage in lint typecheck unit component integration e2e benchmark performance resilience rollback; do
+            ./test "$stage" --karmi "$GITHUB_WORKSPACE/karmi" --output "$RUNNER_TEMP/evidence/$stage" || status=1
+          done
+          exit "$status"
+
+      - name: Upload evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: main-suite-evidence
+          path: ${{ runner.temp }}/evidence/
+
+  release:
+    # Release tier: the complete gate. External/owner gates and the phone gate are BLOCKED here by design,
+    # so this job stays red until they are satisfied; the artifacts are the release evidence either way.
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    needs: [ test, cross-repo, static-security, main-suite ]
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: Kashyep/Karmi
+          ref: ${{ env.KARMI_REF }}
+          path: karmi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.47.5"
+          channel: stable
+
+      - name: Isolated runtimes
+        run: |
+          python -m venv .venv && .venv/bin/pip install -q -e '.[dev]'
+          python -m venv karmi/.venv && karmi/.venv/bin/pip install -q -c karmi/requirements.lock -e './karmi[dev]'
+          npm install -g "pyright@${PYRIGHT_VERSION}"
+          (cd karmi/mobile && flutter pub get)
+
+      - name: Reproducibility (two independent 60-case runs must produce identical snapshots)
+        run: |
+          ./test benchmark --karmi "$GITHUB_WORKSPACE/karmi" --output "$RUNNER_TEMP/repro-1"
+          ./test benchmark --karmi "$GITHUB_WORKSPACE/karmi" --output "$RUNNER_TEMP/repro-2"
+          diff "$RUNNER_TEMP/repro-1/regression-snapshot.json" "$RUNNER_TEMP/repro-2/regression-snapshot.json"
+
+      - name: Release check
+        id: gate
+        run: ./test release-check --karmi "$GITHUB_WORKSPACE/karmi" --output "$RUNNER_TEMP/release"
+
+      - name: Record versions
+        if: always()
+        run: |
+          {
+            echo "## Release evidence"
+            echo "- Parakh: ${GITHUB_SHA} (${GITHUB_REF_NAME})"
+            echo "- Karmi: ${KARMI_REF}"
+            python3 -c "import json,sys; m=json.load(open(sys.argv[1])); print('- State:', m.get('state'), '| production_ready:', m.get('production_ready'))" "$RUNNER_TEMP/release/production-readiness.json" || echo "- no report produced"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload release evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-evidence-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/release/
+            ${{ runner.temp }}/repro-1/regression-snapshot.json
+            ${{ runner.temp }}/repro-2/regression-snapshot.json
