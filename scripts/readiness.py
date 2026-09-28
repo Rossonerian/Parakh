@@ -32,7 +32,7 @@ SENSITIVE = re.compile(r"(?i)(authorization|bearer|api[_-]?key|access[_-]?token|
 COMMANDS = (
     "doctor", "lint", "typecheck", "unit", "component", "integration", "e2e",
     "mobile-smoke", "mobile-e2e", "security", "performance", "resilience",
-    "benchmark", "full", "production-check", "release-check",
+    "benchmark", "rollback", "full", "production-check", "release-check",
 )
 BASELINE = "benchmarks/readiness-baseline.json"
 # Deterministic parts of the 60-case demo summary (report file paths/promptfoo exports vary per run).
@@ -329,18 +329,25 @@ class Runner:
         if not script.is_file():
             self.record("MOBILE", "physical-android", "BLOCKED", "candidate-bound device test script absent")
         else:
-            args = [sys.executable, str(script), "--output", str(self.output / "device"),
+            args = [python(self.karmi) or sys.executable, str(script), "--output", str(self.output / "device"),
                     "--extended" if extended else "--smoke"]
-            if self.mobile_evidence is not None:
-                args += ["--steps", str(self.mobile_evidence)]
-            self.run("MOBILE", "physical-android", args, self.karmi, blocked_evidence=evidence_file)
+            # Reviewed human observations when supplied; otherwise the automated uiautomator journey.
+            args += ["--steps", str(self.mobile_evidence)] if self.mobile_evidence is not None else ["--drive"]
+            self.run("MOBILE", "physical-android", args, self.karmi, blocked_evidence=evidence_file, timeout=1200)
         if evidence_file.is_file():
             data = json.loads(evidence_file.read_text(encoding="utf-8"))
             self.manifest["device"] = {key: data.get(key) for key in
-                                       ("serial", "karmi_sha", "apk_sha256", "installed_apk_sha256")}
+                                       ("serial", "karmi_sha", "apk_sha256", "installed_apk_sha256",
+                                        "observation_method")}
             for step in data["steps"]:
                 self.record("MOBILE", f"phone-{step['id']}", step["status"],
-                            "manual observation recorded" if step["status"] in ("PASS", "FAIL") else "no validated observation")
+                            step["observation"][:300] if step["status"] in ("PASS", "FAIL") else
+                            "no validated observation")
+            navigation = data.get("checks", {}).get("extended_navigation")
+            if extended:
+                self.record("MOBILE", "phone-extended-navigation",
+                            navigation["status"] if navigation else "NOT_RUN",
+                            navigation["detail"] if navigation else "no extended navigation evidence")
         else:
             for step in ("launch", "initial_screen", "configuration", "backend_reachable", "authentication",
                          "primary_user_flow", "api_request", "api_error", "logout_expiration", "app_restart",
@@ -368,8 +375,10 @@ class Runner:
         self.native("RESILIENCE", "negative-policy-and-budgets", self.karmi,
                     ["-m", "pytest", "-q", "tests/e2e/test_parakh_exchange.py", "tests/unit/test_config.py"])
         self.dependency("RESILIENCE", "postgres-redis-outage", "outage")
-        self.record("RESILIENCE", "device-network-loss", "BLOCKED",
-                    "Requires candidate-bound physical Android observations")
+        # Phone-side network loss/recovery is recorded by the MOBILE journey (see mobile()).
+
+    def rollback(self) -> None:
+        self.dependency("ROLLBACK", "migration-rollback-rehearsal", "rollback")
 
     def production_config(self) -> None:
         executable = python(self.karmi)
@@ -384,7 +393,7 @@ class Runner:
                 args += ["--env-file", str(self.production_env)]
             self.run("PRODUCTION_CONFIG", "karmi-config", args, self.karmi,
                      blocked_evidence=destination)
-        self.record("ROLLBACK", "rollback-exercise", "BLOCKED", "No candidate-bound isolated restore and rollback observation")
+        # ROLLBACK evidence comes from rollback(); only owner/external acceptance is recorded here.
         for gate, reason in (
             ("REAL_IDENTITY", "Production authentication and account isolation have no authorized live evidence"),
             ("PAID_PROVIDER", "Real model/action quality and cost budgets not approved or measured"),
@@ -408,6 +417,7 @@ class Runner:
         self.performance()
         self.resilience()
         self.mobile(extended=False)
+        self.rollback()
         self.production_config()
 
     def save(self) -> bool:
@@ -500,6 +510,7 @@ def main() -> int:
     elif args.command == "security": runner.security()
     elif args.command == "performance": runner.performance()
     elif args.command == "resilience": runner.resilience()
+    elif args.command == "rollback": runner.rollback()
     elif args.command == "mobile-smoke": runner.mobile(extended=False)
     elif args.command == "mobile-e2e": runner.mobile(extended=True)
     elif args.command in ("full", "release-check"): runner.full()

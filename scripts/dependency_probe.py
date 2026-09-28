@@ -114,10 +114,75 @@ def outage(karmi: Path, services: ds.Services) -> dict[str, object]:
             "redis_note": "Karmi's app runtime does not use Redis (config only); Redis is exercised by "
                           "tests/integration. A Redis outage therefore must not affect /ready."}
 
+def sql_count(services: ds.Services, table: str) -> int:
+    result = subprocess.run([services.engine, "exec", services.postgres, "psql", "-U", "daily_agent_test",
+                             "-d", "daily_agent_test", "-tAc", f"SELECT count(*) FROM {table}"],
+                            capture_output=True, text=True, timeout=30, check=False)
+    return int(result.stdout.strip()) if result.returncode == 0 and result.stdout.strip().isdigit() else -1
+
+
+def rollback(karmi: Path, services: ds.Services) -> dict[str, object]:
+    """Schema rollback rehearsal on disposable PostgreSQL: full chain round trip, then a one-release
+    rollback with live data. The previous release's binary is not exercised (schema level only)."""
+    env = {key: os.environ[key] for key in ("PATH", "HOME", "LANG", "TMPDIR") if key in os.environ}
+    env.update(PYTHONPATH=str(karmi / "src"), DAILY_AGENT_ENVIRONMENT="test",
+               DAILY_AGENT_DATABASE_URL=ds.DATABASE_URL, DAILY_AGENT_LIVE_MODELS_ENABLED="false")
+    python = str(karmi / ".venv/bin/python")
+    walked = subprocess.run([python, str(Path(__file__).with_name("migration_rollback.py"))], cwd=karmi, env=env,
+                            capture_output=True, text=True, timeout=600, check=False)
+    try:
+        chain = json.loads(walked.stdout.strip().splitlines()[-1])
+    except (IndexError, ValueError):
+        return {"checks": {"migration_chain_round_trip": False}, "passed": False,
+                "error": walked.stderr.strip().splitlines()[-1:] or ["no output"]}
+    checks: dict[str, bool] = dict(chain["checks"])
+
+    def alembic(*args: str) -> bool:
+        return subprocess.run([python, "-m", "alembic", *args], cwd=karmi, env=env, capture_output=True,
+                              timeout=300, check=False).returncode == 0
+
+    with socket.socket() as address:
+        address.bind(("127.0.0.1", 0))
+        port = address.getsockname()[1]
+    base = f"http://127.0.0.1:{port}"
+    body = {"text": "Draft a short status note", "idempotency_key": "rollback-before"}
+    with tempfile.TemporaryDirectory(prefix="karmi-rollback-") as temporary:
+        server = serve(karmi, Path(temporary) / "unused.db", port, database_url=ds.DATABASE_URL)
+        try:
+            checks["ready_at_head"] = wait_status(base + "/ready", 200, 30) == 200
+            status, raw = request("POST", base + "/dev/token?role=customer")
+            token = json.loads(raw)["token"] if status == 200 else None
+            first = request("POST", base + "/v1/messages", token=token, body=body)
+            checks["data_written_at_head"] = first[0] == 200
+        finally:
+            stop(server)
+        before = {table: sql_count(services, table) for table in ("users", "accounts", "runs")}
+        checks["downgrade_one_release"] = alembic("downgrade", "-1")
+        after = {table: sql_count(services, table) for table in before}
+        checks["core_rows_preserved_by_downgrade"] = before == after and min(before.values()) > 0
+        checks["upgrade_after_rollback"] = alembic("upgrade", "head")
+        server = serve(karmi, Path(temporary) / "unused.db", port, database_url=ds.DATABASE_URL)
+        try:
+            checks["ready_after_reupgrade"] = wait_status(base + "/ready", 200, 30) == 200
+            replay = request("POST", base + "/v1/messages", token=token, body=body)
+            checks["idempotent_replay_survives_rollback"] = (
+                replay[0] == 200 and first[0] == 200
+                and json.loads(replay[1]).get("run_id") == json.loads(first[1]).get("run_id"))
+            fresh = request("POST", base + "/v1/messages", token=token,
+                            body={"text": "Draft after rollback", "idempotency_key": "rollback-after"})
+            checks["new_request_after_reupgrade"] = fresh[0] == 200
+        finally:
+            stop(server)
+    return {"checks": checks, "passed": all(checks.values()), "revisions": chain["revisions"],
+            "head": chain["head"], "row_counts": before,
+            "data_discarded_by_one_release_rollback": chain["tables_dropped_by_head_rollback"],
+            "limitation": "previous-release application binary not run against the downgraded schema"}
+
+
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("mode", choices=("integration", "outage"))
+    parser.add_argument("mode", choices=("integration", "outage", "rollback"))
     parser.add_argument("--karmi", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args()
@@ -128,7 +193,8 @@ def main() -> int:
     else:
         try:
             with ds.disposable() as services:
-                body = integration(karmi) if args.mode == "integration" else outage(karmi, services)
+                body = (integration(karmi) if args.mode == "integration" else outage(karmi, services)
+                        if args.mode == "outage" else rollback(karmi, services))
             result = {"status": "PASS" if body["passed"] else "FAIL", "engine": services.engine, **body}
         except ds.Unavailable as error:
             result = {"status": "BLOCKED", "reason": str(error)}
