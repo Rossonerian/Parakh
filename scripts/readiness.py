@@ -95,7 +95,7 @@ class Runner:
         print(f"{gate} {name}: {status} — {reason}", flush=True)
 
     def run(self, gate: str, name: str, args: list[str], cwd: Path, *, timeout: int = 900,
-            blocked_evidence: Path | None = None) -> None:
+            blocked_evidence: Path | None = None, extra_env: dict[str, str] | None = None) -> None:
         start = utc()
         tick = time.monotonic()
         if not cwd.is_dir():
@@ -108,6 +108,7 @@ class Runner:
         env = {key: os.environ[key] for key in ("PATH", "HOME", "LANG", "LC_ALL", "TERM", "TMPDIR") if key in os.environ}
         env.update(DAILY_AGENT_ENVIRONMENT="test", DAILY_AGENT_LIVE_MODELS_ENABLED="false",
                    DAILY_AGENT_PAID_CHECKOUT_ENABLED="false", DAILY_AGENT_WHATSAPP_ENABLED="false")
+        env.update(extra_env or {})
         filename = f"{len(self.cases):02d}-{re.sub('[^a-z0-9-]', '-', name.lower())}.log"
         try:
             completed = subprocess.run(args, cwd=cwd, env=env, capture_output=True, text=True,
@@ -188,12 +189,17 @@ class Runner:
         else:
             self.record("INTEGRATION", "karmi-test-integration", "BLOCKED",
                         "Docker unavailable for disposable PostgreSQL/Redis")
-        if (self.karmi / "src/daily_agent/parakh/telemetry.py").is_file():
-            self.native("CROSS_SYSTEM", "cross-repo-contract", ROOT,
-                        ["-m", "pytest", "-q", "tests/test_cross_repo_readiness.py"])
+        karmi_python = python(self.karmi)
+        if (self.karmi / "src/daily_agent/parakh/telemetry.py").is_file() and karmi_python:
+            # Karmi's runtime owns FastAPI/SQLAlchemy; Parakh modules come from this checkout.
+            self.run("CROSS_SYSTEM", "cross-repo-contract",
+                     [karmi_python, "-m", "pytest", "-q", "-p", "no:cacheprovider",
+                      "tests/test_cross_repo_readiness.py"], ROOT,
+                     extra_env={"PYTHONPATH": f"{ROOT}{os.pathsep}{self.karmi / 'src'}",
+                                "PARAKH_KARMI_DIR": str(self.karmi), "PARAKH_REQUIRE_KARMI": "1"})
         else:
             self.record("CROSS_SYSTEM", "cross-repo-contract", "BLOCKED",
-                        "Karmi integration branch with Parakh exchange absent")
+                        "Karmi integration branch with Parakh exchange, or its .venv, absent")
 
     def e2e(self) -> None:
         self.parakh_make("E2E", "test-e2e")

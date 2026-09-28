@@ -27,3 +27,36 @@ jobs:
 
       - name: Run offline synthetic demo
         run: make demo
+
+  cross-repo:
+    # Synthetic offline contract against the reviewed Karmi exchange commit; bump deliberately.
+    runs-on: ubuntu-latest
+    env:
+      KARMI_REF: 84e49ad3a215f1e4f5e3d681b76be54c59b3e580
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/checkout@v4
+        with:
+          repository: Kashyep/Karmi
+          ref: ${{ env.KARMI_REF }}
+          path: karmi
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Karmi runtime (locked)
+        run: |
+          python -m pip install --upgrade pip
+          pip install -c karmi/requirements.lock -e './karmi[dev]'
+
+      - name: Karmi -> Parakh synthetic shadow contract
+        env:
+          PARAKH_REQUIRE_KARMI: "1"
+          PARAKH_KARMI_DIR: karmi
+          PYTHONPATH: ".:karmi/src"
+          DAILY_AGENT_ENVIRONMENT: test
+          DAILY_AGENT_LIVE_MODELS_ENABLED: "false"
+        run: python -m pytest -q -p no:cacheprovider tests/test_cross_repo_readiness.py

@@ -4,13 +4,9 @@
 
 This document specifies the integration, verification status, and contract boundary between **Parakh** (the model evaluation and optimization laboratory) and **Karmi** (the production-facing application service).
 
-### Candidate Audit Coordinates
-- **Karmi Repository**: `/home/rosso/Projects/Karmi`
-  - **Branch**: `parakh-shadow-integration`
-  - **Audit SHA**: `84e49ad` (`fix(parakh): database enforces a single SHADOW policy bundle`)
-  - **Base Commit**: `62072fc` (Merge pull request #21 from Kashyep/fix-parth-typo-and-test-collisions)
-- **Parakh Repository**: `/home/rosso/orca/workspaces/Parakh/team-worker_primary-20260928-144842`
-  - **Branch / Base**: `origin/main` (`0c66156`: `docs(contracts): reference reviewed Karmi integration commits`)
+### Candidate coordinates (reviewed 2026-09-28)
+- **Karmi**: sibling checkout `../Karmi` (override with `PARAKH_KARMI_DIR`). The exchange lives on `parakh-shadow-integration` (`84e49ad`, base `62072fc`, not Karmi `main`); the local `readiness-harness` branch (`50991da`) adds the device probe and production-config audit on top of it.
+- **Parakh**: `main`. Record exact SHAs with `./test doctor`; these coordinates are history, not evidence for a changed checkout.
 
 ---
 
@@ -128,50 +124,17 @@ flowchart TD
 
 ---
 
-## 6. Targeted Test Execution Guide for Integration Owner
+## 6. Running the suite
 
-Once merged into the integration branch, the integration owner can execute the complete cross-repository readiness suite using the commands below.
-
-### 6.1 Prerequisites
-1. Python ≥ 3.11 environment.
-2. Candidate Karmi repository at `/home/rosso/Projects/Karmi` with installed virtual environment (`/home/rosso/Projects/Karmi/.venv`).
-3. Parakh workspace root on `PYTHONPATH`.
-
-### 6.2 Test Command
-Run the targeted cross-repo readiness tests from the Parakh workspace root:
+The suite needs Karmi's runtime (FastAPI/SQLAlchemy) plus Parakh's modules. Parakh's own `pytest` skips this module when Karmi is unavailable; the readiness runner sets `PARAKH_REQUIRE_KARMI=1`, so a missing Karmi runtime **fails** that gate instead of skipping into a PASS.
 
 ```sh
-# Run targeted cross-repo readiness integration suite
-PYTHONPATH="/home/rosso/orca/workspaces/Parakh/team-worker_primary-20260928-144842:/home/rosso/Projects/Karmi/src" \
-/home/rosso/Projects/Karmi/.venv/bin/pytest tests/test_cross_repo_readiness.py -v
+./test integration                       # CROSS_SYSTEM cross-repo-contract, recorded in test-results/
+# direct, from the Parakh root:
+PARAKH_REQUIRE_KARMI=1 PYTHONPATH=".:../Karmi/src" ../Karmi/.venv/bin/python -m pytest -q tests/test_cross_repo_readiness.py
 ```
 
-### 6.3 Targeted Sub-Test Execution
-To run specific verification flows:
-
-```sh
-# 1. Offline synthetic flow: Karmi /v1/messages -> Karmi exporter -> Parakh importer & evaluation
-PYTHONPATH=".:/home/rosso/Projects/Karmi/src" \
-/home/rosso/Projects/Karmi/.venv/bin/pytest tests/test_cross_repo_readiness.py -k "test_offline_synthetic_flow" -v
-
-# 2. Reference loader sim fixture check vs real Karmi unknown action rejection
-PYTHONPATH=".:/home/rosso/Projects/Karmi/src" \
-/home/rosso/Projects/Karmi/.venv/bin/pytest tests/test_cross_repo_readiness.py -k "test_parakh_signed_sim_fixture" -v
-
-# 3. Real Karmi SHADOW lifecycle, live route invariance, and shadow re-export
-PYTHONPATH=".:/home/rosso/Projects/Karmi/src" \
-/home/rosso/Projects/Karmi/.venv/bin/pytest tests/test_cross_repo_readiness.py -k "test_karmi_action_bundle" -v
-
-# 4. Verification boundary gate: test-signed bundle unverified & real provider evidence blocked
-PYTHONPATH=".:/home/rosso/Projects/Karmi/src" \
-/home/rosso/Projects/Karmi/.venv/bin/pytest tests/test_cross_repo_readiness.py -k "test_test_signed_bundle" -v
-```
-
-### 6.4 Expected Test Results
-- `4 passed` in ~1.5s.
-- Zero network calls issued.
-- Zero live provider API tokens accessed.
-- All temporary SQLite databases and bundle directories cleaned up automatically via pytest `tmp_path`.
+Observed 2026-09-28 against Karmi `84e49ad`: `4 passed`. Offline only: no provider calls, disposable SQLite under pytest `tmp_path`. The synthetic flow asserts Karmi's actual domain classification: a "remember" request with no saved notes is `ASK_USER`/deferred and Parakh scores it `task_completed=0.0`; drafting requests complete.
 
 ---
 

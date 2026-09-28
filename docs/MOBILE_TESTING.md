@@ -8,7 +8,7 @@ This is a **development-only**, synthetic, non-production workflow. Parakh is an
 cd /home/rosso/Projects/Parakh
 ./test doctor                              # records exact Parakh/Karmi SHA and tool availability
 cd ../Karmi
- git rev-parse HEAD                         # record this commit and branch; exchange needs parakh-shadow-integration
+git rev-parse HEAD                         # record commit/branch; device probe needs readiness-harness (on parakh-shadow-integration)
 adb devices -l                             # exactly one device marked 'device', USB debugging approved on phone
 ```
 

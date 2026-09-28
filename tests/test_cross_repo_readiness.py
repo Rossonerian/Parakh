@@ -18,9 +18,9 @@ Testing constraints:
 from __future__ import annotations
 
 import copy
-import hashlib
 import importlib.util
 import json
+import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 import sys
@@ -30,7 +30,7 @@ import pytest
 
 # Repository root paths
 PARAKH_ROOT = Path(__file__).resolve().parents[1]
-KARMI_ROOT = Path("/home/rosso/Projects/Karmi")
+KARMI_ROOT = Path(os.environ.get("PARAKH_KARMI_DIR", PARAKH_ROOT.parent / "Karmi")).resolve()
 KARMI_SRC = KARMI_ROOT / "src"
 
 # Configure import paths safely: Parakh root takes precedence, Karmi src appended
@@ -52,25 +52,24 @@ from model_lab.storage.sqlite import SQLiteStore
 from model_lab.telemetry.importer import import_batch
 from model_lab.telemetry.schema import TelemetryBatchError, parse_batch
 
+# Parakh's own suite runs without Karmi's runtime. The readiness runner sets
+# PARAKH_REQUIRE_KARMI=1, where a missing Karmi candidate must fail, never skip.
+if importlib.util.find_spec("daily_agent") is None or importlib.util.find_spec("fastapi") is None:
+    if os.environ.get("PARAKH_REQUIRE_KARMI") == "1":
+        raise RuntimeError(f"Karmi runtime/candidate unavailable at {KARMI_SRC}")
+    pytest.skip("cross-repo gate runs via ./test integration in Karmi's runtime", allow_module_level=True)
+
 # Karmi imports
 from daily_agent.api import create_app
 from daily_agent.config import Settings, get_settings
 from daily_agent.db import Base, get_session
-from daily_agent.models import (
-    Account,
-    PolicyBundleEvent,
-    PolicyBundleRecord,
-    RoutingDecision,
-    Subscription,
-    User,
-)
+from daily_agent.models import Account, PolicyBundleRecord, Subscription, User
 from daily_agent.parakh import receiver as karmi_receiver
-from daily_agent.parakh.bundle import BundleRejected, load_bundle as karmi_load_bundle
-from daily_agent.parakh.routing import FEATURE_SCHEMA_VERSION as KARMI_FEATURE_SCHEMA_VERSION, KNOWN_ACTIONS
+from daily_agent.parakh.bundle import BundleRejected
 from daily_agent.parakh.telemetry import build_telemetry_batch
 from daily_agent.security import issue_development_token
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import create_engine, select
 from sqlalchemy.exc import IntegrityError as SQLIntegrityError
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -227,10 +226,11 @@ def test_offline_synthetic_flow_karmi_messages_to_parakh_importer_and_evaluation
     ):
         assert sensitive_fragment not in serialized, f"Privacy violation: {sensitive_fragment} leaked"
 
-    # Verify run fields
+    # Verify run fields; Karmi classifies "remember" requests as memory, not drafting.
+    assert sorted(run["task_domain"] for run in batch["runs"]) == [
+        "communication", "communication", "conversation_memory"]
     for run in batch["runs"]:
         assert run["tier"] == "trika"
-        assert run["task_domain"] == "communication"
         assert run["outcome"]["currency"] == "XTS"  # Synthetic micro-units
         assert len(run["decisions"]) == 1
         decision = run["decisions"][0]
@@ -300,10 +300,17 @@ def test_offline_synthetic_flow_karmi_messages_to_parakh_importer_and_evaluation
         reward_config = RewardConfig()
         reward_records = [reward_for_run(run_record, reward_config) for run_record in parsed.valid]
         assert len(reward_records) == 3
+        # A "remember" query without saved notes is Karmi ASK_USER (deferred), so it must not
+        # be scored as completed; the two drafting requests are accepted.
+        completion_by_domain = sorted(
+            (reward.metadata["task_domain"], reward.components.task_completed) for reward in reward_records)
+        assert completion_by_domain == [
+            ("communication", 1.0), ("communication", 1.0), ("conversation_memory", 0.0)]
         for reward in reward_records:
             assert reward.subject_type == "telemetry_run"
-            assert reward.components.quality is not None
-            assert reward.total is not None
+            assert reward.excluded_reason is None
+            assert reward.components.safety_violation is False
+            assert reward.scalar is not None
     finally:
         parakh_store.close()
 

@@ -1,6 +1,6 @@
 # Testing quickstart (two checkouts)
 
-Two repositories are required side by side. Parakh is the offline evaluator/evidence runner; Karmi is the FastAPI and Flutter app. The Parakh ↔ Karmi exchange currently exists on Karmi's `parakh-shadow-integration` branch, **not** Karmi main. Do not blindly `git pull` and assume that branch is present. Record exact commits with `./test doctor` before testing; neither this guide nor historical evidence proves a changed checkout.
+Two repositories are required side by side. Parakh is the offline evaluator/evidence runner; Karmi is the FastAPI and Flutter app. The Parakh ↔ Karmi exchange exists on Karmi's `parakh-shadow-integration` branch, **not** Karmi main; the device probe (`mobile/tool/readiness_device.py`) and production-config audit (`scripts/readiness_config.py`) are on the local `readiness-harness` branch built on it. Missing either shows as BLOCKED. Do not blindly `git pull` and assume these branches are present. Record exact commits with `./test doctor` before testing; neither this guide nor historical evidence proves a changed checkout.
 
 ```sh
 cd /home/rosso/Projects/Parakh
