@@ -82,11 +82,13 @@ pre-tool-use hook, not just a convention.
 
 ### Multi-agent workflow
 
-- **OMP/Orca (primary):** Opus 5.5 is the supervisor for this project (user
-  decision, 2026-09-26). Implementation and verification go to Gemini High
+- **OMP/Orca (primary):** the agent team is global OMP configuration in
+  `~/.omp/agent/` (roles and routing: `team/MODEL-ROUTING.md`); this repo
+  adds no overrides. Implementation and verification go to Gemini High
   workers only through `agent-team-orca-start` (one worktree + one commit per
-  assignment; supervisor reviews the diff and cherry-picks). Task specs live
-  in `.agent-team/tasks/` (local, untracked); reuse their RULES/RETURN blocks.
+  assignment; supervisor reviews the diff and cherry-picks). This project's
+  run records live in `.agent-team/` (local, untracked); reuse the
+  RULES/RETURN blocks in `.agent-team/tasks/`.
 - **Claude Code:** `.claude/agents/` — `explorer`, `implementer`,
   `test-worker` (Haiku), `reviewer` (Sonnet). Hand them a task packet with
   scope, acceptance and verify command, never "improve the repo".
