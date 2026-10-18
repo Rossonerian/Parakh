@@ -46,7 +46,11 @@
           },
           "class": {
             "type": "string",
-            "enum": ["economy", "balanced", "advanced"]
+            "enum": [
+              "economy",
+              "balanced",
+              "advanced"
+            ]
           },
           "prompt_price_usd": {
             "type": "string",
@@ -65,27 +69,58 @@
           },
           "data_terms": {
             "type": "string",
-            "enum": ["unknown", "no_training", "training_on_prompts"]
+            "enum": [
+              "unknown",
+              "no_training",
+              "training_on_prompts"
+            ]
           },
           "supports_structured_output": {
             "type": "boolean"
           },
           "scores": {
             "type": "object",
-            "required": ["code", "maths", "study", "hindi", "mixed", "summary"],
+            "required": [],
             "properties": {
-              "code": { "type": "number", "minimum": 0, "maximum": 1 },
-              "maths": { "type": "number", "minimum": 0, "maximum": 1 },
-              "study": { "type": "number", "minimum": 0, "maximum": 1 },
-              "hindi": { "type": "number", "minimum": 0, "maximum": 1 },
-              "mixed": { "type": "number", "minimum": 0, "maximum": 1 },
-              "summary": { "type": "number", "minimum": 0, "maximum": 1 }
+              "code": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "maths": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "study": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "hindi": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "mixed": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              },
+              "summary": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1
+              }
             },
             "additionalProperties": false
           },
           "score_status": {
             "type": "string",
-            "enum": ["provisional", "verified"]
+            "enum": [
+              "provisional",
+              "verified"
+            ]
           }
         },
         "additionalProperties": false

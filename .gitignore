@@ -16,3 +16,4 @@ htmlcov/
 test-results/
 production-readiness.json
 PRODUCTION_READINESS_REPORT.md
+.env.openrouter

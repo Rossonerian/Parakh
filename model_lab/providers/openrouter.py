@@ -72,7 +72,7 @@ def load_openrouter_api_key(env_path: Path | str | None = None) -> str:
                         continue
                     if "=" in line:
                         k, v = line.split("=", 1)
-                        if k.strip() == "OPENROUTER_API_KEY":
+                        if k.strip() in {"OPENROUTER_API_KEY", "OPEN_ROUTER_KEY"}:
                             cleaned = v.strip().strip("'\"")
                             if cleaned:
                                 return cleaned

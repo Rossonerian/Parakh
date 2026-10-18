@@ -1,0 +1,410 @@
+{
+  "status": "provisional_capped_probe",
+  "cap": 49,
+  "dispatched": 49,
+  "halt": null,
+  "aborted_models": {},
+  "cases": [
+    "STU-MATH-01",
+    "STU-HIN-01",
+    "STU-CODE-01"
+  ],
+  "rows": [
+    {
+      "model_id": "xingchen-agi/xing4.0-29b-a4b:free",
+      "case_id": "STU-MATH-01",
+      "category": "maths",
+      "ok": false,
+      "passed": false,
+      "error": "TimeoutError: The read operation timed out"
+    },
+    {
+      "model_id": "xingchen-agi/xing4.0-29b-a4b:free",
+      "case_id": "STU-HIN-01",
+      "category": "hindi",
+      "ok": false,
+      "passed": false,
+      "error": "TimeoutError: The read operation timed out"
+    },
+    {
+      "model_id": "nvidia/nemotron-3.5-super-vl:free",
+      "case_id": "STU-MATH-01",
+      "category": "maths",
+      "ok": false,
+      "passed": false,
+      "error": "TimeoutError: The read operation timed out"
+    },
+    {
+      "model_id": "nvidia/nemotron-3.5-super-vl:free",
+      "case_id": "STU-HIN-01",
+      "category": "hindi",
+      "ok": false,
+      "passed": false,
+      "error": "TimeoutError: The read operation timed out"
+    },
+    {
+      "model_id": "dots-studio/dots-3-note-preview:free",
+      "case_id": "STU-MATH-01",
+      "category": "maths",
+      "ok": false,
+      "passed": false,
+      "error": "TimeoutError: The read operation timed out"
+    },
+    {
+      "model_id": "dots-studio/dots-3-note-preview:free",
+      "case_id": "STU-HIN-01",
+      "category": "hindi",
+      "ok": false,
+      "passed": false,
+      "error": "ProviderRuntimeError: openrouter response missing message content"
+    },
+    {
+      "model_id": "liquid/lfm-2.5-2.6b:free",
+      "case_id": "STU-MATH-01",
+      "category": "maths",
+      "ok": true,
+      "passed": true,
+      "finish_reason": "stop",
+      "input_tokens": 36,
+      "output_tokens": 121,
+      "latency_ms": 1078.2,
+      "returned_price_usd": 0.0,
+      "empty": false
+    },
+    {
+      "model_id": "liquid/lfm-2.5-2.6b:free",
+      "case_id": "STU-HIN-01",
+      "category": "hindi",
+      "ok": true,
+      "passed": true,
+      "finish_reason": "stop",
+      "input_tokens": 60,
+      "output_tokens": 502,
+      "latency_ms": 477.6,
+      "returned_price_usd": 0.0,
+      "empty": false
+    },
+    {
+      "model_id": "nvidia/nemotron-3.5-lightning:free",
+      "case_id": "STU-MATH-01",
+      "category": "maths",
+      "ok": false,
+      "passed": false,
+      "error": "ProviderRuntimeError: openrouter response missing message content"
+    },
+    {
+      "model_id": "nvidia/nemotron-3.5-lightning:free",
+      "case_id": "STU-HIN-01",
+      "category": "hindi",
+      "ok": true,
+      "passed": true,
+      "finish_reason": "stop",
+      "input_tokens": 55,
+      "output_tokens": 525,
+      "latency_ms": 372.0,
+      "returned_price_usd": 0.0,
+      "empty": false
+    },
+    {
+      "model_id": "thinkingmachines/inkling-small:free",
+      "case_id": "STU-MATH-01",
+      "category": "maths",
+      "ok": false,
+      "passed": false,
+      "error": "ProviderRuntimeError: openrouter request failed: HTTP 403: thinkingmachines/inkling-small:free is only available on agentic harnesses. Try plugging it into a coding agent or productivity app listed on"
+    },
+    {
+      "model_id": "thinkingmachines/inkling-small:free",
+      "case_id": "STU-HIN-01",
+      "category": "hindi",
+      "ok": false,
+      "passed": false,
+      "error": "ProviderRuntimeError: openrouter request failed: HTTP 403: thinkingmachines/inkling-small:free is only available on agentic harnesses. Try plugging it into a coding agent or productivity app listed on"
+    },
+    {
+      "model_id": "poolside/laguna-s-2.1:free",
+      "case_id": "STU-MATH-01",
+      "category": "maths",
+      "ok": false,
+      "passed": false,
+      "error": "TimeoutError: The read operation timed out"
+    },
+    {
+      "model_id": "poolside/laguna-s-2.1:free",
+      "case_id": "STU-HIN-01",
+      "category": "hindi",
+      "ok": false,
+      "passed": false,
+      "error": "ProviderRuntimeError: openrouter response missing message content"
+    },
+    {
+      "model_id": "thinkingmachines/inkling:free",
+      "case_id": "STU-MATH-01",
+      "category": "maths",
+      "ok": false,
+      "passed": false,
+      "error": "ProviderRuntimeError: openrouter request failed: HTTP 403: thinkingmachines/inkling:free is only available on agentic harnesses. Try plugging it into a coding agent or productivity app listed on https"
+    },
+    {
+      "model_id": "thinkingmachines/inkling:free",
+      "case_id": "STU-HIN-01",
+      "category": "hindi",
+      "ok": false,
+      "passed": false,
+      "error": "ProviderRuntimeError: openrouter request failed: HTTP 403: thinkingmachines/inkling:free is only available on agentic harnesses. Try plugging it into a coding agent or productivity app listed on https"
+    },
+    {
+      "model_id": "poolside/laguna-xs-2.1:free",
+      "case_id": "STU-MATH-01",
+      "category": "maths",
+      "ok": true,
+      "passed": true,
+      "finish_reason": "stop",
+      "input_tokens": 69,
+      "output_tokens": 512,
+      "latency_ms": 456.4,
+      "returned_price_usd": 0.0,
+      "empty": false
+    },
+    {
+      "model_id": "poolside/laguna-xs-2.1:free",
+      "case_id": "STU-HIN-01",
+      "category": "hindi",
+      "ok": true,
+      "passed": true,
+      "finish_reason": "length",
+      "input_tokens": 118,
+      "output_tokens": 800,
+      "latency_ms": 604.9,
+      "returned_price_usd": 0.0,
+      "empty": false
+    },
+    {
+      "model_id": "cohere/north-mini-code:free",
+      "case_id": "STU-MATH-01",
+      "category": "maths",
+      "ok": true,
+      "passed": true,
+      "finish_reason": "stop",
+      "input_tokens": 26,
+      "output_tokens": 144,
+      "latency_ms": 681.3,
+      "returned_price_usd": 0.0,
+      "empty": false
+    },
+    {
+      "model_id": "cohere/north-mini-code:free",
+      "case_id": "STU-HIN-01",
+      "category": "hindi",
+      "ok": true,
+      "passed": true,
+      "finish_reason": "stop",
+      "input_tokens": 34,
+      "output_tokens": 300,
+      "latency_ms": 786.6,
+      "returned_price_usd": 0.0,
+      "empty": false
+    },
+    {
+      "model_id": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "case_id": "STU-MATH-01",
+      "category": "maths",
+      "ok": true,
+      "passed": true,
+      "finish_reason": "stop",
+      "input_tokens": 43,
+      "output_tokens": 80,
+      "latency_ms": 475.0,
+      "returned_price_usd": 0.0,
+      "empty": false
+    },
+    {
+      "model_id": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "case_id": "STU-HIN-01",
+      "category": "hindi",
+      "ok": true,
+      "passed": true,
+      "finish_reason": "stop",
+      "input_tokens": 55,
+      "output_tokens": 120,
+      "latency_ms": 475.8,
+      "returned_price_usd": 0.0,
+      "empty": false
+    },
+    {
+      "model_id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "case_id": "STU-MATH-01",
+      "category": "maths",
+      "ok": true,
+      "passed": true,
+      "finish_reason": "stop",
+      "input_tokens": 43,
+      "output_tokens": 49,
+      "latency_ms": 476.4,
+      "returned_price_usd": 0.0,
+      "empty": false
+    },
+    {
+      "model_id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "case_id": "STU-HIN-01",
+      "category": "hindi",
+      "ok": true,
+      "passed": true,
+      "finish_reason": "stop",
+      "input_tokens": 55,
+      "output_tokens": 245,
+      "latency_ms": 780.3,
+      "returned_price_usd": 0.0,
+      "empty": false
+    },
+    {
+      "model_id": "nvidia/nemotron-3-super-120b-a12b:free",
+      "case_id": "STU-MATH-01",
+      "category": "maths",
+      "ok": true,
+      "passed": true,
+      "finish_reason": "stop",
+      "input_tokens": 43,
+      "output_tokens": 37,
+      "latency_ms": 389.2,
+      "returned_price_usd": 0.0,
+      "empty": false
+    },
+    {
+      "model_id": "google/gemma-4-26b-a4b-it:free",
+      "case_id": "STU-MATH-01",
+      "category": "maths",
+      "ok": false,
+      "passed": false,
+      "error": "ProviderRuntimeError: openrouter request failed: HTTP 429: Provider returned error"
+    },
+    {
+      "model_id": "google/gemma-4-26b-a4b-it:free",
+      "case_id": "STU-HIN-01",
+      "category": "hindi",
+      "ok": false,
+      "passed": false,
+      "error": "ProviderRuntimeError: openrouter request failed: HTTP 429: Provider returned error"
+    },
+    {
+      "model_id": "google/gemma-4-31b-it:free",
+      "case_id": "STU-MATH-01",
+      "category": "maths",
+      "ok": false,
+      "passed": false,
+      "error": "ProviderRuntimeError: openrouter request failed: HTTP 429: Provider returned error"
+    },
+    {
+      "model_id": "google/gemma-4-31b-it:free",
+      "case_id": "STU-HIN-01",
+      "category": "hindi",
+      "ok": false,
+      "passed": false,
+      "error": "ProviderRuntimeError: openrouter request failed: HTTP 429: Provider returned error"
+    },
+    {
+      "model_id": "nvidia/nemotron-3-super-120b-a12b:free",
+      "case_id": "STU-HIN-01",
+      "category": "hindi",
+      "ok": true,
+      "passed": true,
+      "finish_reason": "stop",
+      "input_tokens": 55,
+      "output_tokens": 258,
+      "latency_ms": 285.7,
+      "returned_price_usd": 0.0,
+      "empty": false
+    },
+    {
+      "model_id": "liquid/lfm-2.5-2.6b:free",
+      "case_id": "STU-CODE-01",
+      "category": "code",
+      "ok": true,
+      "passed": true,
+      "finish_reason": "stop",
+      "input_tokens": 35,
+      "output_tokens": 367,
+      "latency_ms": 626.9,
+      "returned_price_usd": 0.0,
+      "empty": false
+    },
+    {
+      "model_id": "nvidia/nemotron-3.5-lightning:free",
+      "case_id": "STU-CODE-01",
+      "category": "code",
+      "ok": true,
+      "passed": true,
+      "finish_reason": "stop",
+      "input_tokens": 42,
+      "output_tokens": 542,
+      "latency_ms": 475.9,
+      "returned_price_usd": 0.0,
+      "empty": false
+    },
+    {
+      "model_id": "poolside/laguna-xs-2.1:free",
+      "case_id": "STU-CODE-01",
+      "category": "code",
+      "ok": true,
+      "passed": true,
+      "finish_reason": "stop",
+      "input_tokens": 68,
+      "output_tokens": 571,
+      "latency_ms": 935.2,
+      "returned_price_usd": 0.0,
+      "empty": false
+    },
+    {
+      "model_id": "cohere/north-mini-code:free",
+      "case_id": "STU-CODE-01",
+      "category": "code",
+      "ok": true,
+      "passed": true,
+      "finish_reason": "stop",
+      "input_tokens": 25,
+      "output_tokens": 221,
+      "latency_ms": 701.9,
+      "returned_price_usd": 0.0,
+      "empty": false
+    },
+    {
+      "model_id": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "case_id": "STU-CODE-01",
+      "category": "code",
+      "ok": true,
+      "passed": true,
+      "finish_reason": "stop",
+      "input_tokens": 42,
+      "output_tokens": 90,
+      "latency_ms": 489.4,
+      "returned_price_usd": 0.0,
+      "empty": false
+    },
+    {
+      "model_id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "case_id": "STU-CODE-01",
+      "category": "code",
+      "ok": true,
+      "passed": true,
+      "finish_reason": "stop",
+      "input_tokens": 42,
+      "output_tokens": 150,
+      "latency_ms": 389.7,
+      "returned_price_usd": 0.0,
+      "empty": false
+    },
+    {
+      "model_id": "nvidia/nemotron-3-super-120b-a12b:free",
+      "case_id": "STU-CODE-01",
+      "category": "code",
+      "ok": true,
+      "passed": true,
+      "finish_reason": "stop",
+      "input_tokens": 42,
+      "output_tokens": 113,
+      "latency_ms": 383.2,
+      "returned_price_usd": 0.0,
+      "empty": false
+    }
+  ]
+}

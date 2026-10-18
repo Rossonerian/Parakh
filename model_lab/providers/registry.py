@@ -13,7 +13,8 @@ REQUIRED_SCORE_KEYS = ("code", "maths", "study", "hindi", "mixed", "summary")
 
 def determine_model_class(context_length: int, scores: Mapping[str, float]) -> str:
     """Classify model into economy, balanced, or advanced based on context length and score."""
-    avg_score = sum(scores.get(k, 0.0) for k in REQUIRED_SCORE_KEYS) / len(REQUIRED_SCORE_KEYS)
+    measured = [scores[k] for k in REQUIRED_SCORE_KEYS if k in scores]
+    avg_score = sum(measured) / len(measured) if measured else 0.0
     if context_length >= 65536 and avg_score >= 0.70:
         return "advanced"
     if context_length >= 16384 and avg_score >= 0.50:
@@ -36,7 +37,8 @@ def build_model_registry(
         provider = item.get("provider", "openrouter")
         context_length = int(item.get("context_length", 32768))
         raw_scores = item.get("scores", {})
-        scores = {k: float(raw_scores.get(k, 0.0)) for k in REQUIRED_SCORE_KEYS}
+        # Only measured task types are emitted; an unmeasured key is absent, never invented as 0.
+        scores = {k: float(raw_scores[k]) for k in REQUIRED_SCORE_KEYS if k in raw_scores}
 
         assigned_class = item.get("class") or determine_model_class(context_length, scores)
         if assigned_class not in VALID_CLASSES:

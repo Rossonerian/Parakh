@@ -1,0 +1,127 @@
+{
+  "schema_version": "model-registry.v1",
+  "snapshot_date": "2026-10-19",
+  "provisional": true,
+  "models": [
+    {
+      "model_id": "liquid/lfm-2.5-2.6b:free",
+      "provider": "openrouter",
+      "class": "economy",
+      "prompt_price_usd": "0",
+      "completion_price_usd": "0",
+      "context_length": 65536,
+      "private_data_allowed": false,
+      "data_terms": "unknown",
+      "supports_structured_output": true,
+      "scores": {
+        "code": 1.0,
+        "maths": 1.0,
+        "hindi": 1.0
+      },
+      "score_status": "provisional"
+    },
+    {
+      "model_id": "nvidia/nemotron-3.5-lightning:free",
+      "provider": "openrouter",
+      "class": "economy",
+      "prompt_price_usd": "0",
+      "completion_price_usd": "0",
+      "context_length": 1000000,
+      "private_data_allowed": false,
+      "data_terms": "unknown",
+      "supports_structured_output": false,
+      "scores": {
+        "code": 1.0,
+        "maths": 0.0,
+        "hindi": 1.0
+      },
+      "score_status": "provisional"
+    },
+    {
+      "model_id": "poolside/laguna-xs-2.1:free",
+      "provider": "openrouter",
+      "class": "balanced",
+      "prompt_price_usd": "0",
+      "completion_price_usd": "0",
+      "context_length": 262144,
+      "private_data_allowed": false,
+      "data_terms": "unknown",
+      "supports_structured_output": false,
+      "scores": {
+        "code": 1.0,
+        "maths": 1.0,
+        "hindi": 1.0
+      },
+      "score_status": "provisional"
+    },
+    {
+      "model_id": "cohere/north-mini-code:free",
+      "provider": "openrouter",
+      "class": "balanced",
+      "prompt_price_usd": "0",
+      "completion_price_usd": "0",
+      "context_length": 256000,
+      "private_data_allowed": false,
+      "data_terms": "unknown",
+      "supports_structured_output": false,
+      "scores": {
+        "code": 1.0,
+        "maths": 1.0,
+        "hindi": 1.0
+      },
+      "score_status": "provisional"
+    },
+    {
+      "model_id": "nvidia/nemotron-3-ultra-550b-a55b:free",
+      "provider": "openrouter",
+      "class": "advanced",
+      "prompt_price_usd": "0",
+      "completion_price_usd": "0",
+      "context_length": 1000000,
+      "private_data_allowed": false,
+      "data_terms": "unknown",
+      "supports_structured_output": false,
+      "scores": {
+        "code": 1.0,
+        "maths": 1.0,
+        "hindi": 1.0
+      },
+      "score_status": "provisional"
+    },
+    {
+      "model_id": "nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free",
+      "provider": "openrouter",
+      "class": "balanced",
+      "prompt_price_usd": "0",
+      "completion_price_usd": "0",
+      "context_length": 256000,
+      "private_data_allowed": false,
+      "data_terms": "unknown",
+      "supports_structured_output": false,
+      "scores": {
+        "code": 1.0,
+        "maths": 1.0,
+        "hindi": 1.0
+      },
+      "score_status": "provisional"
+    },
+    {
+      "model_id": "nvidia/nemotron-3-super-120b-a12b:free",
+      "provider": "openrouter",
+      "class": "advanced",
+      "prompt_price_usd": "0",
+      "completion_price_usd": "0",
+      "context_length": 262144,
+      "private_data_allowed": false,
+      "data_terms": "unknown",
+      "supports_structured_output": true,
+      "scores": {
+        "code": 1.0,
+        "maths": 1.0,
+        "hindi": 1.0
+      },
+      "score_status": "provisional"
+    }
+  ],
+  "notes": "Provisional capped probe (maths + hindi, 1 case each, 1 repeat). Classes are size-based; data terms unknown so private notes are never routed here. Skipped models: {\"dots-studio/dots-3-note-preview:free\": \"no successful reply in the probe\", \"google/gemma-4-26b-a4b-it:free\": \"no successful reply in the probe\", \"google/gemma-4-31b-it:free\": \"no successful reply in the probe\", \"nvidia/nemotron-3.5-super-vl:free\": \"no successful reply in the probe\", \"poolside/laguna-s-2.1:free\": \"no successful reply in the probe\", \"thinkingmachines/inkling-small:free\": \"no successful reply in the probe\", \"thinkingmachines/inkling:free\": \"no successful reply in the probe\", \"xingchen-agi/xing4.0-29b-a4b:free\": \"no successful reply in the probe\"}"
+}
