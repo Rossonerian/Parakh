@@ -1,5 +1,18 @@
 # OpenRouter Free Pilot Operator Execution Guide
 
+> **Reality check (added by supervisor after reading `model_lab/pilot.py`; not yet executed live):**
+> * `pilot run` / `run_authorized_immutable_pilot` currently accepts only a frozen plan whose cases are exactly
+>   `DEVELOPMENT_CASE_COUNT` train-split cases, concurrency 1. The 49-case student set (train + calibration,
+>   3 repeats, later holdout for the shortlist) therefore needs a reviewed change to those gates before it can go
+>   through the normal path. Not made here: it weakens a safety gate and needs owner review.
+> * `pilot.py::_provider_for` uses the pre-existing `providers/live.py::OpenRouterProvider`, which reads
+>   `OPENROUTER_API_KEY` from the process environment. The newer `providers/openrouter.py::OpenRouterAdapter`
+>   (key from `.env.openrouter`, hard request cap, zero-price abort, 429 backoff) is not yet wired into `pilot run`.
+>   Wire it (or export the key from `.env.openrouter` into the environment) as part of that reviewed change.
+> * Some commands below (e.g. `pilot plan` flags, `grade` arguments) were written without being run; confirm each
+>   against `model-lab <cmd> --help` before use.
+
+
 ## Status and Safety Boundary
 This document defines the strict, reproducible procedure for running a live evaluation pilot using OpenRouter's free-tier models once credentials and verified request caps are established.
 
