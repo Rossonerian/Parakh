@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ModelRegistryV1",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "snapshot_date",
+    "provisional",
+    "models"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "model-registry.v1"
+    },
+    "snapshot_date": {
+      "type": "string",
+      "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"
+    },
+    "provisional": {
+      "type": "boolean"
+    },
+    "models": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "model_id",
+          "provider",
+          "class",
+          "prompt_price_usd",
+          "completion_price_usd",
+          "context_length",
+          "private_data_allowed",
+          "data_terms",
+          "supports_structured_output",
+          "scores",
+          "score_status"
+        ],
+        "properties": {
+          "model_id": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string"
+          },
+          "class": {
+            "type": "string",
+            "enum": ["economy", "balanced", "advanced"]
+          },
+          "prompt_price_usd": {
+            "type": "string",
+            "const": "0"
+          },
+          "completion_price_usd": {
+            "type": "string",
+            "const": "0"
+          },
+          "context_length": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "private_data_allowed": {
+            "type": "boolean"
+          },
+          "data_terms": {
+            "type": "string",
+            "enum": ["unknown", "no_training", "training_on_prompts"]
+          },
+          "supports_structured_output": {
+            "type": "boolean"
+          },
+          "scores": {
+            "type": "object",
+            "required": ["code", "maths", "study", "hindi", "mixed", "summary"],
+            "properties": {
+              "code": { "type": "number", "minimum": 0, "maximum": 1 },
+              "maths": { "type": "number", "minimum": 0, "maximum": 1 },
+              "study": { "type": "number", "minimum": 0, "maximum": 1 },
+              "hindi": { "type": "number", "minimum": 0, "maximum": 1 },
+              "mixed": { "type": "number", "minimum": 0, "maximum": 1 },
+              "summary": { "type": "number", "minimum": 0, "maximum": 1 }
+            },
+            "additionalProperties": false
+          },
+          "score_status": {
+            "type": "string",
+            "enum": ["provisional", "verified"]
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

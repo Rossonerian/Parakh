@@ -642,3 +642,88 @@ def test_test_signed_bundle_is_unverified_and_real_provider_evidence_blocked(
     }
     assert readiness_status["real_action_provider_evidence"] == "BLOCKED"
     assert readiness_status["production_traffic_promotion"] == "BLOCKED"
+
+
+def test_gateway_retry_ratings_and_regenerate_export_imports_without_quarantine(
+    karmi_exchange: dict[str, Any],
+) -> None:
+    """A gateway run with a failed first attempt, a thumbs-down and a regenerate round-trips.
+
+    Uses Karmi's real gateway over a fake HTTP transport (no network), the real exporter, and
+    Parakh's real importer: zero quarantined runs, feedback and failed attempts preserved.
+    """
+    import httpx
+    from daily_agent.gateway import build_gateway
+    from daily_agent.gateway.registry import parse_registry
+
+    def entry(model_id: str) -> dict[str, Any]:
+        return {
+            "model_id": model_id, "provider": "openrouter", "class": "balanced",
+            "prompt_price_usd": "0", "completion_price_usd": "0", "context_length": 32000,
+            "private_data_allowed": False, "data_terms": "unknown", "scores": {},
+        }
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if json.loads(request.content)["model"] == "vendor/a:free":
+            return httpx.Response(500, json={})
+        return httpx.Response(200, json={
+            "choices": [{"message": {"content": "Photosynthesis turns light into sugar."},
+                         "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 20, "completion_tokens": 8},
+        })
+
+    client: TestClient = karmi_exchange["client"]
+    headers = karmi_exchange["headers"]
+    gateway_settings = Settings(
+        environment="test", database_url="sqlite+pysqlite:///:memory:",
+        openrouter_enabled=True, openrouter_api_key="sk-or-synthetic",
+    )
+    client.app.state.gateway = build_gateway(  # type: ignore[attr-defined]
+        gateway_settings,
+        registry=parse_registry({
+            "schema_version": "model-registry.v1", "snapshot_date": "2026-10-18",
+            "models": [entry("vendor/a:free"), entry("vendor/b:free")],
+        }),
+        transport=httpx.MockTransport(handler),
+    )
+    window_start = datetime.now(UTC) - timedelta(hours=1)
+    text = "Explain photosynthesis simply"
+
+    first = client.post("/v1/messages", json={"text": text, "idempotency_key": "gw-synth-001"},
+                        headers=headers).json()
+    assert first["route"] == "openrouter/vendor/b:free"
+    rated = client.post(f"/v1/runs/{first['run_id']}/feedback",
+                        json={"rating": "down", "reason": "unclear"}, headers=headers)
+    assert rated.status_code == 200
+    again = client.post(f"/v1/runs/{first['run_id']}/regenerate",
+                        json={"text": text, "idempotency_key": "gw-synth-002", "reason": "unclear"},
+                        headers=headers).json()
+    assert again["previous_run_id"] == first["run_id"]
+
+    with karmi_exchange["factory"]() as session:
+        batch = build_telemetry_batch(
+            session,
+            start=window_start,
+            end=datetime.now(UTC) + timedelta(hours=1),
+            registry=client.app.state.gateway.registry,  # type: ignore[attr-defined]
+        )
+    contract_schema = json.loads(
+        (PARAKH_ROOT / "contracts/telemetry_batch_v1.schema.json").read_text(encoding="utf-8")
+    )
+    assert schema_check.errors(batch, contract_schema) == []
+    assert {m["model"] for m in batch["model_registry"]} >= {"vendor/a:free", "vendor/b:free"}
+    original = next(r for r in batch["runs"] if r["outcome"]["user_retry_signal"])
+    assert [a["success"] for a in original["attempts"]] == [False, True]
+    assert sorted(f["feedback_type"] for f in original["feedback"]) == ["rating", "retry"]
+    serialized = json.dumps(batch)
+    for fragment in ("photosynthesis", "gw-synth-001", "sk-or-synthetic"):
+        assert fragment not in serialized
+
+    parakh_store = SQLiteStore(str(karmi_exchange["tmp_path"] / "parakh_gateway.sqlite3"))
+    try:
+        result = import_batch(parakh_store, batch)
+        assert result.status == "imported"
+        assert result.quarantined == 0
+        assert result.accepted == len(batch["runs"]) == 2
+    finally:
+        parakh_store.close()

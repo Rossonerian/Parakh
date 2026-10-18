@@ -174,6 +174,12 @@ def build_parser() -> argparse.ArgumentParser:
     recommend.add_argument("--draft", action="store_true", default=False)
     recommend.add_argument("--constraint-map", default="docs/live_pilots/router-constraint-map-v0.2.0.json")
     optimization.add_parsers(sub, router_sub)
+    catalog = sub.add_parser("catalog", help="inspect and snapshot provider catalogs")
+    catalog_sub = catalog.add_subparsers(dest="catalog_command", required=True)
+    catalog_snap = catalog_sub.add_parser("snapshot", help="snapshot zero-price free models from openrouter")
+    catalog_snap.add_argument("--out", default="docs/live_pilots/catalog", help="output directory or file for snapshot JSON")
+    catalog_snap.add_argument("--base-url", default="https://openrouter.ai/api/v1")
+    catalog_snap.add_argument("--date", help="snapshot date YYYY-MM-DD")
     return parser
 
 
@@ -391,6 +397,16 @@ def main(argv: list[str] | None = None) -> int:
                 _write_json(args.out, result)
             _print_json(result)
             return 0 if activation_ready else 2
+        if args.command == "catalog":
+            if args.catalog_command == "snapshot":
+                from model_lab.providers.openrouter import snapshot_catalog
+                out_path = snapshot_catalog(
+                    out_dir=args.out,
+                    base_url=args.base_url,
+                    snapshot_date=args.date,
+                )
+                _print_json({"status": "ok", "path": str(out_path)})
+                return 0
         if args.command in {"grade", "compare", "report", "audit"}:
             if args.command == "grade" and args.db and args.suite and args.run_id:
                 suite = load_suite(args.suite)

@@ -1,0 +1,24 @@
+{
+  "suite_version": "student-0.1.0",
+  "total_cases": 49,
+  "category_counts": {
+    "code": 10,
+    "maths": 10,
+    "study": 10,
+    "hindi": 8,
+    "mixed": 8,
+    "summary": 3
+  },
+  "splits": {
+    "train": 31,
+    "calibration": 9,
+    "holdout": 9
+  },
+  "checksums": {
+    "cases.jsonl": "2a492f3455e56b3fd24a751f814fc096c9347e0fa80da98c1ffcd44c3a1370ed",
+    "train.jsonl": "337a84814c1a6ff785d5ef15b627c3e793d899a728b1760809ea9b7ad90cffaa",
+    "calibration.jsonl": "8b555e7803204bac1f9188951fbf2b9cabb2eeaccfc279c186e1bc18869f618a",
+    "holdout.jsonl": "08027363652f3f829c6e4c749b69601d10428e07162ef5974a777e436bccddaa"
+  },
+  "holdout_sha256": "08027363652f3f829c6e4c749b69601d10428e07162ef5974a777e436bccddaa"
+}

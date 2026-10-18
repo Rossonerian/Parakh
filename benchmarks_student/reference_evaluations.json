@@ -1,0 +1,552 @@
+{
+  "STU-CODE-01": {
+    "case_id": "STU-CODE-01",
+    "category": "code",
+    "split": "train",
+    "reference_answer": "def is_even(n: int) -> bool:\n    return n % 2 == 0",
+    "check_type": "python_exec",
+    "check_code": "assert is_even(4) is True\nassert is_even(7) is False\nassert is_even(0) is True"
+  },
+  "STU-CODE-02": {
+    "case_id": "STU-CODE-02",
+    "category": "code",
+    "split": "train",
+    "reference_answer": "def reverse_string(s: str) -> str:\n    return s[::-1]",
+    "check_type": "python_exec",
+    "check_code": "assert reverse_string('karmi') == 'imrak'\nassert reverse_string('') == ''"
+  },
+  "STU-CODE-03": {
+    "case_id": "STU-CODE-03",
+    "category": "code",
+    "split": "train",
+    "reference_answer": "def sum_of_squares(nums: list[int]) -> int:\n    return sum(x * x for x in nums)",
+    "check_type": "python_exec",
+    "check_code": "assert sum_of_squares([1, 2, 3]) == 14\nassert sum_of_squares([]) == 0"
+  },
+  "STU-CODE-04": {
+    "case_id": "STU-CODE-04",
+    "category": "code",
+    "split": "train",
+    "reference_answer": "def count_vowels(text: str) -> int:\n    return sum(1 for c in text.lower() if c in 'aeiou')",
+    "check_type": "python_exec",
+    "check_code": "assert count_vowels('Namaste India') == 6\nassert count_vowels('xyz') == 0"
+  },
+  "STU-CODE-05": {
+    "case_id": "STU-CODE-05",
+    "category": "code",
+    "split": "train",
+    "reference_answer": "def find_max(nums: list[int]) -> int:\n    return max(nums)",
+    "check_type": "python_exec",
+    "check_code": "assert find_max([10, 42, 5, 99, 12]) == 99\nassert find_max([-5, -1]) == -1"
+  },
+  "STU-CODE-06": {
+    "case_id": "STU-CODE-06",
+    "category": "code",
+    "split": "train",
+    "reference_answer": "def is_palindrome(s: str) -> bool:\n    clean = [c.lower() for c in s if c.isalnum()]\n    return clean == clean[::-1]",
+    "check_type": "python_exec",
+    "check_code": "assert is_palindrome('A man, a plan, a canal: Panama') is True\nassert is_palindrome('race a car') is False"
+  },
+  "STU-CODE-07": {
+    "case_id": "STU-CODE-07",
+    "category": "code",
+    "split": "calibration",
+    "reference_answer": "def fibonacci(n: int) -> int:\n    if n <= 0:\n        return 0\n    elif n == 1:\n        return 1\n    a, b = 0, 1\n    for _ in range(2, n + 1):\n        a, b = b, a + b\n    return b",
+    "check_type": "python_exec",
+    "check_code": "assert fibonacci(0) == 0\nassert fibonacci(1) == 1\nassert fibonacci(7) == 13"
+  },
+  "STU-CODE-08": {
+    "case_id": "STU-CODE-08",
+    "category": "code",
+    "split": "calibration",
+    "reference_answer": "def flatten_list(nested: list[list[int]]) -> list[int]:\n    return [item for sub in nested for item in sub]",
+    "check_type": "python_exec",
+    "check_code": "assert flatten_list([[1, 2], [3, 4], [5]]) == [1, 2, 3, 4, 5]"
+  },
+  "STU-CODE-09": {
+    "case_id": "STU-CODE-09",
+    "category": "code",
+    "split": "holdout",
+    "reference_answer": "def merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:\n    if not intervals:\n        return []\n    sorted_i = sorted(intervals, key=lambda x: x[0])\n    merged = [sorted_i[0]]\n    for start, end in sorted_i[1:]:\n        prev_start, prev_end = merged[-1]\n        if start <= prev_end:\n            merged[-1] = (prev_start, max(prev_end, end))\n        else:\n            merged.append((start, end))\n    return merged",
+    "check_type": "python_exec",
+    "check_code": "assert merge_intervals([(1, 3), (2, 6), (8, 10), (15, 18)]) == [(1, 6), (8, 10), (15, 18)]"
+  },
+  "STU-CODE-10": {
+    "case_id": "STU-CODE-10",
+    "category": "code",
+    "split": "holdout",
+    "reference_answer": "def two_sum(nums: list[int], target: int) -> tuple[int, int] | None:\n    seen = {}\n    for i, n in enumerate(nums):\n        comp = target - n\n        if comp in seen:\n            return (seen[comp], i)\n        seen[n] = i\n    return None",
+    "check_type": "python_exec",
+    "check_code": "assert two_sum([2, 7, 11, 15], 9) == (0, 1)\nassert two_sum([3, 2, 4], 6) == (1, 2)"
+  },
+  "STU-MATH-01": {
+    "case_id": "STU-MATH-01",
+    "category": "maths",
+    "split": "train",
+    "reference_answer": "46",
+    "check_type": "exact_numeric",
+    "expected": 46.0
+  },
+  "STU-MATH-02": {
+    "case_id": "STU-MATH-02",
+    "category": "maths",
+    "split": "train",
+    "reference_answer": "90",
+    "check_type": "exact_numeric",
+    "expected": 90.0
+  },
+  "STU-MATH-03": {
+    "case_id": "STU-MATH-03",
+    "category": "maths",
+    "split": "train",
+    "reference_answer": "180",
+    "check_type": "exact_numeric",
+    "expected": 180.0
+  },
+  "STU-MATH-04": {
+    "case_id": "STU-MATH-04",
+    "category": "maths",
+    "split": "train",
+    "reference_answer": "12",
+    "check_type": "exact_numeric",
+    "expected": 12.0
+  },
+  "STU-MATH-05": {
+    "case_id": "STU-MATH-05",
+    "category": "maths",
+    "split": "train",
+    "reference_answer": "900",
+    "check_type": "exact_numeric",
+    "expected": 900.0
+  },
+  "STU-MATH-06": {
+    "case_id": "STU-MATH-06",
+    "category": "maths",
+    "split": "train",
+    "reference_answer": "60",
+    "check_type": "exact_numeric",
+    "expected": 60.0
+  },
+  "STU-MATH-07": {
+    "case_id": "STU-MATH-07",
+    "category": "maths",
+    "split": "calibration",
+    "reference_answer": "60",
+    "check_type": "exact_numeric",
+    "expected": 60.0
+  },
+  "STU-MATH-08": {
+    "case_id": "STU-MATH-08",
+    "category": "maths",
+    "split": "calibration",
+    "reference_answer": "11",
+    "check_type": "exact_numeric",
+    "expected": 11.0
+  },
+  "STU-MATH-09": {
+    "case_id": "STU-MATH-09",
+    "category": "maths",
+    "split": "holdout",
+    "reference_answer": "360",
+    "check_type": "exact_numeric",
+    "expected": 360.0
+  },
+  "STU-MATH-10": {
+    "case_id": "STU-MATH-10",
+    "category": "maths",
+    "split": "holdout",
+    "reference_answer": "5/36",
+    "check_type": "exact_string",
+    "expected": "5/36"
+  },
+  "STU-STUDY-01": {
+    "case_id": "STU-STUDY-01",
+    "category": "study",
+    "split": "train",
+    "reference_answer": "Photosynthesis is the process by which green plants synthesize glucose from carbon dioxide and water using sunlight absorbed by chlorophyll. Oxygen is released as a byproduct during this reaction.",
+    "check_type": "keywords",
+    "keywords": [
+      "photosynthesis",
+      "chlorophyll",
+      "sunlight",
+      "carbon dioxide",
+      "oxygen"
+    ]
+  },
+  "STU-STUDY-02": {
+    "case_id": "STU-STUDY-02",
+    "category": "study",
+    "split": "train",
+    "reference_answer": "Newton's First Law states that an object remains at rest or in uniform motion unless acted upon by an external unbalanced force. This tendency to resist change in motion is called inertia, such as when passengers lurch forward when a bus brakes suddenly.",
+    "check_type": "keywords",
+    "keywords": [
+      "inertia",
+      "rest",
+      "motion",
+      "force"
+    ]
+  },
+  "STU-STUDY-03": {
+    "case_id": "STU-STUDY-03",
+    "category": "study",
+    "split": "train",
+    "reference_answer": "Kinetic energy is the energy possessed by an object due to its motion, like a moving car. Potential energy is stored energy due to an object's position or state, such as water stored behind a dam.",
+    "check_type": "keywords",
+    "keywords": [
+      "kinetic",
+      "potential",
+      "motion",
+      "energy"
+    ]
+  },
+  "STU-STUDY-04": {
+    "case_id": "STU-STUDY-04",
+    "category": "study",
+    "split": "train",
+    "reference_answer": "The water cycle describes continuous water movement on Earth. Water heats and undergoes evaporation into vapor, cools to form clouds via condensation, and falls back to Earth as precipitation.",
+    "check_type": "keywords",
+    "keywords": [
+      "evaporation",
+      "condensation",
+      "precipitation",
+      "clouds"
+    ]
+  },
+  "STU-STUDY-05": {
+    "case_id": "STU-STUDY-05",
+    "category": "study",
+    "split": "train",
+    "reference_answer": "Plant cells possess a rigid cellulose cell wall and chloroplasts for photosynthesis, whereas animal cells lack both cell walls and chloroplasts and have only a flexible cell membrane.",
+    "check_type": "keywords",
+    "keywords": [
+      "cell wall",
+      "chloroplasts",
+      "plant",
+      "animal"
+    ]
+  },
+  "STU-STUDY-06": {
+    "case_id": "STU-STUDY-06",
+    "category": "study",
+    "split": "train",
+    "reference_answer": "Ohm's Law states that current flowing through a conductor between two points is directly proportional to voltage and inversely proportional to resistance: V = I * R.",
+    "check_type": "keywords",
+    "keywords": [
+      "voltage",
+      "current",
+      "resistance",
+      "ohm"
+    ]
+  },
+  "STU-STUDY-07": {
+    "case_id": "STU-STUDY-07",
+    "category": "study",
+    "split": "calibration",
+    "reference_answer": "Hemoglobin is an iron-rich protein in red blood cells that binds reversibly to oxygen in the lungs to form oxyhemoglobin, transporting oxygen to tissues throughout the body.",
+    "check_type": "keywords",
+    "keywords": [
+      "hemoglobin",
+      "oxygen",
+      "red blood cells",
+      "lungs"
+    ]
+  },
+  "STU-STUDY-08": {
+    "case_id": "STU-STUDY-08",
+    "category": "study",
+    "split": "calibration",
+    "reference_answer": "Renewable energy comes from inexhaustible natural sources like solar and wind power. Non-renewable energy comes from finite sources that deplete over time, such as coal and petroleum.",
+    "check_type": "keywords",
+    "keywords": [
+      "renewable",
+      "solar",
+      "wind",
+      "coal",
+      "petroleum"
+    ]
+  },
+  "STU-STUDY-09": {
+    "case_id": "STU-STUDY-09",
+    "category": "study",
+    "split": "holdout",
+    "reference_answer": "Enzymes are protein catalysts that speed up chemical reactions by lowering the activation energy required. Substrate molecules bind specifically to the enzyme's active site forming an enzyme-substrate complex.",
+    "check_type": "keywords",
+    "keywords": [
+      "enzymes",
+      "catalyst",
+      "activation energy",
+      "active site",
+      "substrate"
+    ]
+  },
+  "STU-STUDY-10": {
+    "case_id": "STU-STUDY-10",
+    "category": "study",
+    "split": "holdout",
+    "reference_answer": "The greenhouse effect is the trapping of heat in Earth's atmosphere by gases such as carbon dioxide and methane, preventing thermal radiation from escaping into space and causing global warming.",
+    "check_type": "keywords",
+    "keywords": [
+      "greenhouse",
+      "carbon dioxide",
+      "methane",
+      "atmosphere",
+      "warming"
+    ]
+  },
+  "STU-HIN-01": {
+    "case_id": "STU-HIN-01",
+    "category": "hindi",
+    "split": "train",
+    "reference_answer": "प्रकाश संश्लेषण वह प्रक्रिया है जिसके द्वारा हरे पौधे सूर्य के प्रकाश और क्लोरोफिल की सहायता से अपना भोजन बनाते हैं। इस प्रक्रिया में पौधे कार्बन डाइऑक्साइड लेते हैं और ऑक्सीजन छोड़ते हैं।",
+    "check_type": "devanagari",
+    "keywords": [
+      "पौधे",
+      "प्रकाश",
+      "भोजन",
+      "ऑक्सीजन"
+    ]
+  },
+  "STU-HIN-02": {
+    "case_id": "STU-HIN-02",
+    "category": "hindi",
+    "split": "train",
+    "reference_answer": "जल संरक्षण के लिए वर्षा जल संचयन करना चाहिए और दैनिक कार्यों में पानी का व्यर्थ बहाव रोकना चाहिए।",
+    "check_type": "devanagari",
+    "keywords": [
+      "जल",
+      "संरक्षण",
+      "पानी"
+    ]
+  },
+  "STU-HIN-03": {
+    "case_id": "STU-HIN-03",
+    "category": "hindi",
+    "split": "train",
+    "reference_answer": "सौर मंडल का सबसे बड़ा ग्रह बृहस्पति है। यह एक गैसीय दानव है और इसमें विशाल लाल धब्बा तूफान मौजूद है।",
+    "check_type": "devanagari",
+    "keywords": [
+      "बृहस्पति",
+      "ग्रह",
+      "सौर मंडल"
+    ]
+  },
+  "STU-HIN-04": {
+    "case_id": "STU-HIN-04",
+    "category": "hindi",
+    "split": "train",
+    "reference_answer": "संतुलित आहार वह आहार है जिसमें शरीर की वृद्धि और स्वास्थ्य के लिए सभी आवश्यक पोषक तत्व उचित मात्रा में हों, जैसे प्रोटीन और कार्बोहाइड्रेट।",
+    "check_type": "devanagari",
+    "keywords": [
+      "संतुलित आहार",
+      "पोषक तत्व",
+      "प्रोटीन"
+    ]
+  },
+  "STU-HIN-05": {
+    "case_id": "STU-HIN-05",
+    "category": "hindi",
+    "split": "train",
+    "reference_answer": "पर्यावरण प्रदूषण रोकने के लिए वृक्षारोपण बढ़ाना चाहिए, प्लास्टिक का उपयोग बंद करना चाहिए और सार्वजनिक वाहनों का अधिक उपयोग करना चाहिए।",
+    "check_type": "devanagari",
+    "keywords": [
+      "पर्यावरण",
+      "प्रदूषण",
+      "वृक्षारोपण"
+    ]
+  },
+  "STU-HIN-06": {
+    "case_id": "STU-HIN-06",
+    "category": "hindi",
+    "split": "train",
+    "reference_answer": "हार्डवेयर कंप्यूटर के भौतिक भाग होते हैं जिन्हें हम छू सकते हैं जैसे कीबोर्ड और मॉनिटर। सॉफ्टवेयर वे प्रोग्राम और निर्देश होते हैं जो कंप्यूटर को कार्य करने का निर्देश देते हैं।",
+    "check_type": "devanagari",
+    "keywords": [
+      "हार्डवेयर",
+      "सॉफ्टवेयर",
+      "कंप्यूटर"
+    ]
+  },
+  "STU-HIN-07": {
+    "case_id": "STU-HIN-07",
+    "category": "hindi",
+    "split": "calibration",
+    "reference_answer": "भारतीय संविधान की प्रस्तावना भारत को एक संप्रभु, समाजवादी, धर्मनिरपेक्ष, लोकतांत्रिक गणराज्य घोषित करती है और सभी नागरिकों के लिए सामाजिक, आर्थिक व राजनीतिक न्याय, स्वतंत्रता, समानता और बंधुता सुनिश्चित करती है।",
+    "check_type": "devanagari",
+    "keywords": [
+      "संविधान",
+      "प्रस्तावना",
+      "न्याय",
+      "समानता",
+      "स्वतंत्रता"
+    ]
+  },
+  "STU-HIN-08": {
+    "case_id": "STU-HIN-08",
+    "category": "hindi",
+    "split": "holdout",
+    "reference_answer": "ओजोन परत समताप मंडल में स्थित है और यह सूर्य से आने वाली हानिकारक पराबैंगनी किरणों को अवशोषित करके पृथ्वी पर जीवन की रक्षा करती है।",
+    "check_type": "devanagari",
+    "keywords": [
+      "ओजोन परत",
+      "पराबैंगनी",
+      "पृथ्वी",
+      "रक्षा"
+    ]
+  },
+  "STU-MIX-01": {
+    "case_id": "STU-MIX-01",
+    "category": "mixed",
+    "split": "train",
+    "reference_answer": "Speed ek scalar quantity hai jisme sirf magnitude hota hai, jabki velocity ek vector quantity hai jisme magnitude ke saath direction bhi hoti hai.",
+    "check_type": "mixed_script",
+    "keywords": [
+      "speed",
+      "velocity",
+      "scalar",
+      "vector",
+      "magnitude"
+    ]
+  },
+  "STU-MIX-02": {
+    "case_id": "STU-MIX-02",
+    "category": "mixed",
+    "split": "train",
+    "reference_answer": "RAM temporary memory hoti hai jo volatile hai aur power off hone par data erase ho jata hai. ROM permanent memory hai jisme boot instructions store hote hain.",
+    "check_type": "mixed_script",
+    "keywords": [
+      "ram",
+      "rom",
+      "volatile",
+      "memory",
+      "data"
+    ]
+  },
+  "STU-MIX-03": {
+    "case_id": "STU-MIX-03",
+    "category": "mixed",
+    "split": "train",
+    "reference_answer": "Acids taste me sour hote hain aur blue litmus ko red kar dete hain. Bases taste me bitter hote hain aur red litmus ko blue kar dete hain.",
+    "check_type": "mixed_script",
+    "keywords": [
+      "acid",
+      "base",
+      "litmus",
+      "red",
+      "blue"
+    ]
+  },
+  "STU-MIX-04": {
+    "case_id": "STU-MIX-04",
+    "category": "mixed",
+    "split": "train",
+    "reference_answer": "Time management ke liye daily study routine ka realistic schedule banao jisme regular breaks hon, aur difficult topics ko subah fresh mind se pehle cover karo.",
+    "check_type": "mixed_script",
+    "keywords": [
+      "study",
+      "schedule",
+      "routine",
+      "time"
+    ]
+  },
+  "STU-MIX-05": {
+    "case_id": "STU-MIX-05",
+    "category": "mixed",
+    "split": "train",
+    "reference_answer": "Mitosis me ek parent cell se 2 identical diploid daughter cells banti hain growth ke liye. Meiosis me 4 haploid gamete cells banti hain reproduction ke liye.",
+    "check_type": "mixed_script",
+    "keywords": [
+      "mitosis",
+      "meiosis",
+      "cell",
+      "diploid",
+      "haploid"
+    ]
+  },
+  "STU-MIX-06": {
+    "case_id": "STU-MIX-06",
+    "category": "mixed",
+    "split": "train",
+    "reference_answer": "Inflation ka matlab hai general price level badhna, jisse currency ki purchasing power kam ho jati hai aur daily budget affect hota hai kyunki items expensive ho jate hain.",
+    "check_type": "mixed_script",
+    "keywords": [
+      "inflation",
+      "price",
+      "budget",
+      "purchasing power"
+    ]
+  },
+  "STU-MIX-07": {
+    "case_id": "STU-MIX-07",
+    "category": "mixed",
+    "split": "calibration",
+    "reference_answer": "Supervised learning me model labeled data par train hota hai jaise spam detection. Unsupervised learning me unlabeled data ke patterns aur clusters find kiye jate hain jaise customer segmentation.",
+    "check_type": "mixed_script",
+    "keywords": [
+      "supervised",
+      "unsupervised",
+      "labeled",
+      "data",
+      "train"
+    ]
+  },
+  "STU-MIX-08": {
+    "case_id": "STU-MIX-08",
+    "category": "mixed",
+    "split": "holdout",
+    "reference_answer": "Phishing ek cyber attack hai jisme account security compromise karke fake emails ya websites ke through users se passwords churaye jate hain. Suspicious links par click na karein aur 2FA enable karein.",
+    "check_type": "mixed_script",
+    "keywords": [
+      "phishing",
+      "attack",
+      "password",
+      "security",
+      "links"
+    ]
+  },
+  "STU-SUM-01": {
+    "case_id": "STU-SUM-01",
+    "category": "summary",
+    "split": "train",
+    "reference_answer": "The Udayagiri High-Altitude Solar and Astronomical Research Facility was founded in 1974 by Dr. Anandamurthy Kulkarni and Professor Sneha Deshmukh. It is situated on the Vindhyachal plateau at latitude 23.4128 N, longitude 77.7214 E, at an elevation of 742 meters above sea level. Its three primary historical instruments were the Surya-70 Solar Spectrograph, the Vindhya-120 Cassegrain Reflector (1.2m), and the Rohini Wide-Field Schmidt Camera. In 2003, the facility installed a 150 kW solar photovoltaic microgrid to achieve energy independence and prevent detector interruptions.",
+    "check_type": "keywords",
+    "keywords": [
+      "1974",
+      "Kulkarni",
+      "Deshmukh",
+      "Vindhyachal",
+      "742",
+      "Surya-70",
+      "Vindhya-120",
+      "Rohini",
+      "150",
+      "solar"
+    ]
+  },
+  "STU-SUM-02": {
+    "case_id": "STU-SUM-02",
+    "category": "summary",
+    "split": "calibration",
+    "reference_answer": "- Mechanism: Summer heating creates a low-pressure area drawing moist Southwest Monsoon winds from the Indian Ocean between June and September.\n- Agriculture: Supplies over 70% of annual rainfall essential for Kharif crops like rice, pulses, and sugarcane.\n- Distribution: Rainfall is uneven, with Western Ghats and Northeast receiving over 2,500 mm while the Thar desert remains arid.",
+    "check_type": "keywords",
+    "keywords": [
+      "southwest monsoon",
+      "kharif",
+      "70%",
+      "indian ocean",
+      "rainfall"
+    ]
+  },
+  "STU-SUM-03": {
+    "case_id": "STU-SUM-03",
+    "category": "summary",
+    "split": "holdout",
+    "reference_answer": "Students can borrow up to four books for fourteen days, with late returns fined at two rupees per day up to a hundred rupees. Reference books and rare manuscripts cannot be taken out and must be used inside the reading hall.",
+    "check_type": "keywords",
+    "keywords": [
+      "four books",
+      "fourteen",
+      "fine",
+      "reading hall"
+    ]
+  }
+}
